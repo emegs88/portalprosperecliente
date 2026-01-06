@@ -1,0 +1,97 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  
+  clientProfile  ClientProfile?
+  importBatches  ImportBatch[]
+  quotas         Quota[]
+}
+
+model ClientProfile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  nome      String
+  documento String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ImportBatch {
+  id         String   @id @default(cuid())
+  userId     String
+  sourceType String   @default("PDF") // "PDF" ou "XLSX"
+  filename   String
+  status     String   // "processing", "completed", "failed", "pending_review"
+  parsedAt   DateTime?
+  createdAt  DateTime @default(now())
+  errorsJson String?  // JSON array de erros
+  
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quotas         Quota[]
+  importTotals   ImportTotals?
+}
+
+model Quota {
+  id                String   @id @default(cuid())
+  userId            String
+  importBatchId     String
+  administradora    String?
+  empresa           String?
+  grupo             String
+  cota              String
+  versao            String
+  dataVenda         String   // dd/mm/yyyy
+  situacaoCobranca  String
+  contemplacao      String
+  percentPago       Float
+  percentAtraso     Float
+  percentFundoComum Float
+  pclsPagar         Int
+  pclsPagas         Int
+  pclsPagasEmDia    Int
+  pclsPagasAtraso   Int
+  pclsEmAtraso      Int
+  vlBem             Float
+  vlParcela         Float
+  vlQuitacao        Float
+  vlReceber         Float
+  needsReview       Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  importBatch  ImportBatch  @relation(fields: [importBatchId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([importBatchId])
+  @@index([grupo, cota])
+}
+
+model ImportTotals {
+  id              String   @id @default(cuid())
+  importBatchId   String   @unique
+  totalCotas      Int
+  totalVlBem      Float
+  totalVlParcela  Float
+  totalVlQuitacao Float
+  totalVlReceber  Float
+  
+  importBatch ImportBatch @relation(fields: [importBatchId], references: [id], onDelete: Cascade)
+}
