@@ -107,12 +107,39 @@ projeto-cliente-prospere/
 - O sistema é multi-tenant: cada usuário só vê seus próprios dados
 - Os dados são protegidos por autenticação JWT
 
-## 🚢 Deploy
+## 🚢 Deploy na Vercel
 
-1. Configure variáveis de ambiente no ambiente de produção
-2. Execute `npm run build`
-3. Execute `npm run db:migrate` no servidor
-4. Inicie com `npm run start`
+### Pré-requisitos
+- Conta na Vercel (https://vercel.com)
+- Banco de dados PostgreSQL (Vercel Postgres, Neon, Supabase, etc.)
+
+### Passo a Passo
+
+1. **Conecte o repositório**
+   - Acesse https://vercel.com/new
+   - Importe o repositório: `emegs88/portalprosperecliente`
+
+2. **Configure Variáveis de Ambiente** (Settings → Environment Variables):
+   ```
+   DATABASE_URL=postgresql://usuario:senha@host:5432/database?schema=public
+   NEXTAUTH_URL=https://seu-projeto.vercel.app
+   NEXTAUTH_SECRET=sua-chave-secreta-aleatoria-aqui
+   NODE_ENV=production
+   ```
+
+3. **Banco de Dados PostgreSQL**
+   - **Opção 1 (Recomendado)**: Adicione "Vercel Postgres" como addon no projeto
+   - **Opção 2**: Use Neon (https://neon.tech) ou Supabase (https://supabase.com) gratuitamente
+
+4. **Deploy Automático**
+   - A Vercel detecta automaticamente o Next.js
+   - O build roda automaticamente com `prisma generate && prisma migrate deploy && next build`
+
+5. **Após o Deploy**
+   - Acesse sua aplicação em: `https://seu-projeto.vercel.app`
+   - Faça login com qualquer email (autenticação temporária configurada)
+
+📖 **Veja mais detalhes em**: [VERCEL_DEPLOY.md](./VERCEL_DEPLOY.md)
 
 ## 📄 Licença
 
