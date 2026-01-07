@@ -53,14 +53,28 @@ export interface ParsedResult {
  */
 function isValidQuotaLine(line: string): boolean {
   const trimmed = line.trim()
-  // Padrão mais flexível: grupo (6 dígitos) + cota (4 dígitos) + versão (2 dígitos) + data
+  if (trimmed.length < 20) return false // Linha muito curta não é cota
+  
+  // Padrão 1: Exato: 6 dígitos + espaço + 4 dígitos + espaço + 2 dígitos + espaço + data
   const pattern1 = /^\d{6}\s+\d{4}\s+\d{2}\s+\d{2}\/\d{2}\/\d{4}/
-  // Padrão alternativo: sem espaços exatos
+  
+  // Padrão 2: Com espaços flexíveis
   const pattern2 = /^\d{6}[\s]+\d{4}[\s]+\d{2}[\s]+\d{2}\/\d{2}\/\d{4}/
-  // Padrão ainda mais flexível
+  
+  // Padrão 3: Mais flexível - grupo e cota em qualquer lugar com data
   const pattern3 = /\d{6}.*\d{4}.*\d{2}\/\d{2}\/\d{4}/
   
-  return pattern1.test(trimmed) || pattern2.test(trimmed) || pattern3.test(trimmed)
+  // Padrão 4: Grupo e cota juntos (sem espaço): 0007062013
+  const pattern4 = /\d{6}\d{4}.*\d{2}\/\d{2}\/\d{4}/
+  
+  // Padrão 5: Apenas verificar se tem grupo (6 dígitos) + cota (4 dígitos) + data
+  const pattern5 = /\b\d{6}\b.*\b\d{4}\b.*\d{2}\/\d{2}\/\d{4}/
+  
+  // Padrão 6: Formato alternativo com hífen: 000706-2013
+  const pattern6 = /\d{6}[-\s]+\d{4}.*\d{2}\/\d{2}\/\d{4}/
+  
+  return pattern1.test(trimmed) || pattern2.test(trimmed) || pattern3.test(trimmed) || 
+         pattern4.test(trimmed) || pattern5.test(trimmed) || pattern6.test(trimmed)
 }
 
 /**
@@ -103,56 +117,116 @@ function parseQuotaLine(line: string): ParsedQuota | null {
     }
   }
   
-  if (parts.length < 15) {
-    return null
-  }
-
   try {
-    const grupo = parts[0]?.replace(/\D/g, '').padStart(6, '0').substring(0, 6) || ''
-    const cota = parts[1]?.replace(/\D/g, '').padStart(4, '0').substring(0, 4) || ''
-    const versao = parts[2]?.replace(/\D/g, '').padStart(2, '0').substring(0, 2) || '00'
+    // PRIMEIRO: Extrair grupo e cota (obrigatórios) - tentar múltiplas estratégias
+    let grupo = ''
+    let cota = ''
+    
+    // Estratégia 1: Regex direto na linha
+    const grupoCotaMatch = trimmed.match(/(\d{6})[-\s]*(\d{4})/)
+    if (grupoCotaMatch) {
+      grupo = grupoCotaMatch[1]
+      cota = grupoCotaMatch[2]
+    }
+    
+    // Estratégia 2: Se não encontrou, usar partes
+    if (!grupo || !cota) {
+      const grupoPart = parts[0]?.replace(/\D/g, '') || ''
+      if (grupoPart.length >= 10) {
+        // Grupo e cota juntos (0007062013)
+        grupo = grupoPart.substring(0, 6)
+        cota = grupoPart.substring(6, 10)
+      } else if (grupoPart.length >= 6) {
+        grupo = grupoPart.substring(0, 6)
+        cota = parts[1]?.replace(/\D/g, '').padStart(4, '0').substring(0, 4) || ''
+      } else if (parts.length >= 2) {
+        grupo = grupoPart.padStart(6, '0').substring(0, 6)
+        cota = parts[1]?.replace(/\D/g, '').padStart(4, '0').substring(0, 4) || ''
+      }
+    }
+    
+    // Se ainda não encontrou grupo e cota, não é uma cota válida
+    if (!grupo || !cota || grupo.length !== 6 || cota.length !== 4) {
+      return null
+    }
+    
+    // Versão (2 dígitos) - pode estar na posição 2 ou após grupo+cota
+    let versao = '00'
+    const versaoMatch = trimmed.match(/(?:^|\s)(\d{2})(?:\s|$)/)
+    if (versaoMatch && versaoMatch[1]) {
+      versao = versaoMatch[1]
+    } else if (parts[2] && /^\d{2}$/.test(parts[2])) {
+      versao = parts[2]
+    }
     
     // Data pode estar no formato dd/mm/yyyy ou junto com outros dados
-    let dataVenda = parts[3] || ''
-    if (!/\d{2}\/\d{2}\/\d{4}/.test(dataVenda)) {
-      // Procurar data na linha
-      const dateMatch = trimmed.match(/(\d{2}\/\d{2}\/\d{4})/)
-      dataVenda = dateMatch ? dateMatch[1] : ''
+    let dataVenda = ''
+    const dateMatch = trimmed.match(/(\d{2}\/\d{2}\/\d{4})/)
+    if (dateMatch) {
+      dataVenda = dateMatch[1]
+    } else if (parts[3] && /\d{2}\/\d{2}\/\d{4}/.test(parts[3])) {
+      dataVenda = parts[3]
     }
     
     // Situação pode estar junto ou separada
-    let situacaoCobranca = parts[4] || ''
+    let situacaoCobranca = ''
     let contemplacao = ''
-    let idx = 5
+    let idx = 3 // Começar após data
     
-    // Procurar "Não Contemplada" ou "Contemplada"
-    const contemplacaoMatch = trimmed.match(/(Não\s+)?Contemplada/i)
+    // Procurar "Não Contemplada" ou "Contemplada" na linha inteira
+    const contemplacaoMatch = trimmed.match(/(Não\s+)?Contemplada/gi)
     if (contemplacaoMatch) {
       contemplacao = contemplacaoMatch[0]
-      // Ajustar índice se necessário
-      while (idx < parts.length && !parts[idx]?.toLowerCase().includes('contemplad')) {
-        idx++
-      }
-    } else {
-      contemplacao = parts.slice(idx, idx + 2).join(' ') || 'Não Contemplada'
-      idx += 2
     }
     
-    // Extrair valores numéricos
-    const percentPago = idx < parts.length ? parseBrazilianPercent(parts[idx] || '0') : 0
+    // Procurar situação (N00, ATRASO, etc)
+    const situacaoMatch = trimmed.match(/(N\d+|ATRASO|NORMAL|CANCELADA)/i)
+    if (situacaoMatch) {
+      situacaoCobranca = situacaoMatch[0]
+    }
+    
+    // Se não encontrou, tentar usar parts
+    if (!contemplacao) {
+      // Procurar nas partes
+      for (let j = idx; j < Math.min(idx + 5, parts.length); j++) {
+        if (parts[j]?.toLowerCase().includes('contemplad')) {
+          contemplacao = parts.slice(j, j + 2).join(' ') || 'Não Contemplada'
+          idx = j + 2
+          break
+        }
+      }
+      if (!contemplacao) {
+        contemplacao = 'Não Contemplada'
+      }
+    }
+    
+    // Se não encontrou situação, usar padrão
+    if (!situacaoCobranca) {
+      situacaoCobranca = parts[idx] || 'N00 - NORMAL'
+      idx++
+    }
+    
+    // Extrair valores numéricos - procurar padrões na linha inteira também
+    // Percentuais (podem estar com % ou não)
+    const percentPagoMatch = trimmed.match(/(\d+[.,]\d+)\s*%/i) || trimmed.match(/(\d+[.,]\d+)/)
+    const percentPago = percentPagoMatch ? parseBrazilianPercent(percentPagoMatch[1]) : 
+                       (idx < parts.length ? parseBrazilianPercent(parts[idx] || '0') : 0)
+    
     const percentAtraso = idx + 1 < parts.length ? parseBrazilianPercent(parts[idx + 1] || '0') : 0
     const percentFundoComum = idx + 2 < parts.length ? parseBrazilianPercent(parts[idx + 2] || '0') : 0
-    const pclsPagar = idx + 3 < parts.length ? parseInt(parts[idx + 3]?.replace(/\D/g, '') || '0', 10) : 0
-    const pclsPagas = idx + 4 < parts.length ? parseInt(parts[idx + 4]?.replace(/\D/g, '') || '0', 10) : 0
-    const pclsPagasEmDia = idx + 5 < parts.length ? parseInt(parts[idx + 5]?.replace(/\D/g, '') || '0', 10) : 0
-    const pclsPagasAtraso = idx + 6 < parts.length ? parseInt(parts[idx + 6]?.replace(/\D/g, '') || '0', 10) : 0
-    const pclsEmAtraso = idx + 7 < parts.length ? parseInt(parts[idx + 7]?.replace(/\D/g, '') || '0', 10) : 0
     
-    // Valores monetários - procurar padrões com vírgula
-    const vlBem = extractMonetaryValue(parts, idx + 8)
-    const vlParcela = extractMonetaryValue(parts, idx + 9)
-    const vlQuitacao = extractMonetaryValue(parts, idx + 10)
-    const vlReceber = extractMonetaryValue(parts, idx + 11)
+    // Parcelas (números inteiros)
+    const pclsPagar = extractIntegerValue(parts, idx + 3, trimmed)
+    const pclsPagas = extractIntegerValue(parts, idx + 4, trimmed)
+    const pclsPagasEmDia = extractIntegerValue(parts, idx + 5, trimmed)
+    const pclsPagasAtraso = extractIntegerValue(parts, idx + 6, trimmed)
+    const pclsEmAtraso = extractIntegerValue(parts, idx + 7, trimmed)
+    
+    // Valores monetários - procurar padrões com vírgula na linha inteira
+    const vlBem = extractMonetaryValue(parts, idx + 8, trimmed)
+    const vlParcela = extractMonetaryValue(parts, idx + 9, trimmed)
+    const vlQuitacao = extractMonetaryValue(parts, idx + 10, trimmed)
+    const vlReceber = extractMonetaryValue(parts, idx + 11, trimmed)
 
     // Detectar tipo de bem
     let tipoBem: string | undefined = undefined
@@ -191,21 +265,55 @@ function parseQuotaLine(line: string): ParsedQuota | null {
 }
 
 /**
- * Extrai valor monetário de uma lista de partes, procurando padrões brasileiros
+ * Extrai valor monetário de uma lista de partes ou da linha inteira, procurando padrões brasileiros
  */
-function extractMonetaryValue(parts: string[], startIdx: number): number {
-  if (startIdx >= parts.length) return 0
-  
-  // Tentar o índice direto
-  let value = parseBrazilianNumber(parts[startIdx] || '0')
-  if (value > 0) return value
+function extractMonetaryValue(parts: string[], startIdx: number, fullLine?: string): number {
+  // Tentar o índice direto primeiro
+  if (startIdx < parts.length) {
+    const value = parseBrazilianNumber(parts[startIdx] || '0')
+    if (value > 0) return value
+  }
   
   // Procurar em índices próximos
-  for (let i = Math.max(0, startIdx - 2); i <= Math.min(parts.length - 1, startIdx + 2); i++) {
+  for (let i = Math.max(0, startIdx - 2); i <= Math.min(parts.length - 1, startIdx + 3); i++) {
     const part = parts[i]
-    if (part && /[\d.,]/.test(part) && part.includes(',')) {
+    if (part && /[\d.,]/.test(part) && (part.includes(',') || part.includes('.'))) {
       const parsed = parseBrazilianNumber(part)
       if (parsed > 0) return parsed
+    }
+  }
+  
+  // Se não encontrou, procurar na linha inteira por padrões monetários
+  if (fullLine) {
+    const monetaryPatterns = fullLine.match(/(\d{1,3}(?:\.\d{3})*(?:,\d{2})?)/g)
+    if (monetaryPatterns && monetaryPatterns.length > 0) {
+      // Retornar o maior valor encontrado (geralmente é o valor do bem)
+      const values = monetaryPatterns.map(p => parseBrazilianNumber(p)).filter(v => v > 0)
+      if (values.length > 0) {
+        return Math.max(...values)
+      }
+    }
+  }
+  
+  return 0
+}
+
+/**
+ * Extrai valor inteiro (parcelas) de uma lista de partes ou da linha inteira
+ */
+function extractIntegerValue(parts: string[], startIdx: number, fullLine?: string): number {
+  // Tentar o índice direto
+  if (startIdx < parts.length) {
+    const value = parseInt(parts[startIdx]?.replace(/\D/g, '') || '0', 10)
+    if (value > 0) return value
+  }
+  
+  // Procurar em índices próximos
+  for (let i = Math.max(0, startIdx - 1); i <= Math.min(parts.length - 1, startIdx + 2); i++) {
+    const part = parts[i]
+    if (part && /^\d+$/.test(part.replace(/[^\d]/g, ''))) {
+      const parsed = parseInt(part.replace(/\D/g, ''), 10)
+      if (parsed > 0 && parsed < 1000) return parsed // Parcelas geralmente < 1000
     }
   }
   
@@ -303,6 +411,14 @@ export function parsePDFText(text: string): ParsedResult {
       .filter(l => l.length > 5) // Filtrar linhas muito curtas
 
     console.log(`📄 Total de linhas extraídas: ${allLines.length}`)
+    
+    // Log de amostra das primeiras linhas para debug
+    if (allLines.length > 0) {
+      console.log('📄 Primeiras 5 linhas (amostra):')
+      allLines.slice(0, 5).forEach((line, idx) => {
+        console.log(`  ${idx + 1}: ${line.substring(0, 100)}`)
+      })
+    }
 
     // Parse header
     result.header = parseHeader(allLines)
@@ -310,37 +426,89 @@ export function parsePDFText(text: string): ParsedResult {
 
     // Parse quotas - tentar diferentes estratégias
     let quotasFound = 0
+    const processedIndices = new Set<number>() // Evitar duplicatas
     
-    // Estratégia 1: Linha por linha
-    for (const line of allLines) {
+    // Estratégia 1: Linha por linha (mais comum)
+    console.log('🔍 Estratégia 1: Processando linhas individuais...')
+    for (let i = 0; i < allLines.length; i++) {
+      const line = allLines[i]
       const quota = parseQuotaLine(line)
       if (quota) {
-        result.quotas.push(quota)
-        quotasFound++
-      }
-    }
-
-    // Estratégia 2: Se não encontrou, tentar juntar linhas quebradas
-    if (quotasFound === 0) {
-      console.log('⚠️  Nenhuma cota encontrada linha por linha, tentando juntar linhas quebradas...')
-      for (let i = 0; i < allLines.length - 1; i++) {
-        const combinedLine = allLines[i] + ' ' + allLines[i + 1]
-        const quota = parseQuotaLine(combinedLine)
-        if (quota) {
+        // Verificar se já não temos esta cota (evitar duplicatas)
+        const isDuplicate = result.quotas.some(q => q.grupo === quota.grupo && q.cota === quota.cota)
+        if (!isDuplicate) {
           result.quotas.push(quota)
           quotasFound++
+          processedIndices.add(i)
+          
+          // Log a cada 10 cotas encontradas
+          if (quotasFound % 10 === 0) {
+            console.log(`  ✓ ${quotasFound} cotas encontradas até agora...`)
+          }
+        }
+      }
+    }
+    console.log(`  ✓ Estratégia 1 concluída: ${quotasFound} cotas encontradas`)
+
+    // Estratégia 2: Tentar juntar linhas quebradas (quando cota está dividida em 2 linhas)
+    if (quotasFound < 50) { // Se encontrou poucas, tentar juntar linhas
+      console.log('⚠️  Apenas', quotasFound, 'cotas encontradas, tentando juntar linhas quebradas...')
+      for (let i = 0; i < allLines.length - 1; i++) {
+        if (processedIndices.has(i) || processedIndices.has(i + 1)) continue // Pular se já processado
+        
+        const combinedLine = allLines[i].trim() + ' ' + allLines[i + 1].trim()
+        const quota = parseQuotaLine(combinedLine)
+        if (quota) {
+          const isDuplicate = result.quotas.some(q => q.grupo === quota.grupo && q.cota === quota.cota)
+          if (!isDuplicate) {
+            result.quotas.push(quota)
+            quotasFound++
+            processedIndices.add(i)
+            processedIndices.add(i + 1)
+          }
         }
       }
     }
 
-    // Estratégia 3: Buscar padrões mais flexíveis
-    if (quotasFound === 0) {
-      console.log('⚠️  Tentando padrões mais flexíveis...')
-      for (const line of allLines) {
-        // Buscar padrão: grupo-cota em qualquer lugar da linha
-        const grupoCotaMatch = line.match(/(\d{6})\s*[-\s]+\s*(\d{4})/)
+    // Estratégia 3: Tentar juntar 3 linhas (para casos muito complexos)
+    if (quotasFound < 30) {
+      console.log('⚠️  Ainda poucas cotas, tentando juntar 3 linhas...')
+      for (let i = 0; i < allLines.length - 2; i++) {
+        if (processedIndices.has(i) || processedIndices.has(i + 1) || processedIndices.has(i + 2)) continue
+        
+        const combinedLine = allLines[i].trim() + ' ' + allLines[i + 1].trim() + ' ' + allLines[i + 2].trim()
+        const quota = parseQuotaLine(combinedLine)
+        if (quota) {
+          const isDuplicate = result.quotas.some(q => q.grupo === quota.grupo && q.cota === quota.cota)
+          if (!isDuplicate) {
+            result.quotas.push(quota)
+            quotasFound++
+          }
+        }
+      }
+    }
+
+    // Estratégia 4: Buscar padrões mais flexíveis e tentar parse manual
+    if (quotasFound < 20) {
+      console.log('⚠️  Buscando padrões flexíveis de grupo-cota...')
+      for (let i = 0; i < allLines.length; i++) {
+        if (processedIndices.has(i)) continue
+        
+        const line = allLines[i]
+        // Buscar qualquer padrão que pareça grupo-cota
+        const grupoCotaMatch = line.match(/(\d{6})[-\s]+(\d{4})/)
         if (grupoCotaMatch) {
-          console.log('🔍 Possível linha de cota encontrada:', line.substring(0, 100))
+          console.log(`🔍 Linha ${i} parece ter grupo-cota:`, line.substring(0, 150))
+          // Tentar parsear mesmo que não passe na validação inicial
+          const quota = parseQuotaLine(line)
+          if (quota) {
+            const isDuplicate = result.quotas.some(q => q.grupo === quota.grupo && q.cota === quota.cota)
+            if (!isDuplicate) {
+              result.quotas.push(quota)
+              quotasFound++
+              processedIndices.add(i)
+            }
+          }
         }
       }
     }
@@ -356,10 +524,17 @@ export function parsePDFText(text: string): ParsedResult {
     if (result.quotas.length === 0) {
       result.errors.push('Nenhuma cota válida encontrada no PDF')
       console.error('❌ ERRO: Nenhuma cota encontrada!')
-      console.error('Primeiras 10 linhas do PDF:')
-      allLines.slice(0, 10).forEach((line, idx) => {
+      console.error('Primeiras 20 linhas do PDF:')
+      allLines.slice(0, 20).forEach((line, idx) => {
         console.error(`  ${idx + 1}: ${line.substring(0, 150)}`)
       })
+      console.error('Últimas 10 linhas do PDF:')
+      allLines.slice(-10).forEach((line, idx) => {
+        const actualIdx = allLines.length - 10 + idx
+        console.error(`  ${actualIdx + 1}: ${line.substring(0, 150)}`)
+      })
+    } else {
+      console.log(`✅ Total de ${result.quotas.length} cotas únicas encontradas (após remoção de duplicatas)`)
     }
 
   } catch (error) {

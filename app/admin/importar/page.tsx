@@ -13,69 +13,165 @@ import { LogoutButton } from '@/components/LogoutButton'
 export default function AdminImportarPage() {
   const { data: session } = useSession()
   const router = useRouter()
-  const [file, setFile] = useState<File | null>(null)
+  const [files, setFiles] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
   const [status, setStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle')
   const [message, setMessage] = useState('')
-  const [jobId, setJobId] = useState<string | null>(null)
+  const [jobIds, setJobIds] = useState<string[]>([])
+  const [processedFiles, setProcessedFiles] = useState<number>(0)
+  const [isDragging, setIsDragging] = useState(false)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const selectedFile = e.target.files[0]
-      const ext = selectedFile.name.split('.').pop()?.toLowerCase()
-      
-      if (!['pdf', 'xlsx', 'xls', 'csv'].includes(ext || '')) {
-        setMessage('Formato de arquivo não suportado. Use PDF, XLSX, XLS ou CSV.')
+    if (e.target.files && e.target.files.length > 0) {
+      const selectedFiles = Array.from(e.target.files)
+      const validFiles: File[] = []
+      const invalidFiles: string[] = []
+
+      selectedFiles.forEach(file => {
+        const ext = file.name.split('.').pop()?.toLowerCase()
+        if (['pdf', 'xlsx', 'xls', 'csv'].includes(ext || '')) {
+          validFiles.push(file)
+        } else {
+          invalidFiles.push(file.name)
+        }
+      })
+
+      if (invalidFiles.length > 0) {
+        setMessage(`Arquivos inválidos: ${invalidFiles.join(', ')}. Formatos suportados: PDF, XLSX, XLS, CSV.`)
         setStatus('error')
-        return
       }
 
-      setFile(selectedFile)
+      if (validFiles.length > 0) {
+        setFiles(prev => [...prev, ...validFiles])
+        setStatus('idle')
+        if (invalidFiles.length === 0) {
+          setMessage('')
+        }
+      }
+    }
+  }
+
+  const removeFile = (index: number) => {
+    setFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+
+    if (uploading) return
+
+    const droppedFiles = Array.from(e.dataTransfer.files)
+    const validFiles: File[] = []
+    const invalidFiles: string[] = []
+
+    droppedFiles.forEach(file => {
+      const ext = file.name.split('.').pop()?.toLowerCase()
+      if (['pdf', 'xlsx', 'xls', 'csv'].includes(ext || '')) {
+        validFiles.push(file)
+      } else {
+        invalidFiles.push(file.name)
+      }
+    })
+
+    if (invalidFiles.length > 0) {
+      setMessage(`Arquivos inválidos: ${invalidFiles.join(', ')}. Formatos suportados: PDF, XLSX, XLS, CSV.`)
+      setStatus('error')
+    }
+
+    if (validFiles.length > 0) {
+      setFiles(prev => [...prev, ...validFiles])
       setStatus('idle')
-      setMessage('')
+      if (invalidFiles.length === 0) {
+        setMessage('')
+      }
     }
   }
 
   const handleUpload = async () => {
-    if (!file) {
-      setMessage('Por favor, selecione um arquivo.')
+    if (files.length === 0) {
+      setMessage('Por favor, selecione pelo menos um arquivo.')
       setStatus('error')
       return
     }
 
     setUploading(true)
     setStatus('processing')
-    setMessage('Enviando arquivo...')
+    setProcessedFiles(0)
+    setJobIds([])
+    setMessage(`Enviando ${files.length} arquivo(s)...`)
+
+    const uploadedJobIds: string[] = []
+    let successCount = 0
+    let errorCount = 0
 
     try {
-      const formData = new FormData()
-      formData.append('file', file)
+      // Processar cada arquivo sequencialmente
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        setMessage(`Processando arquivo ${i + 1} de ${files.length}: ${file.name}...`)
 
-      const res = await fetch('/api/admin/importar-extrato', {
-        method: 'POST',
-        body: formData,
-      })
+        try {
+          const formData = new FormData()
+          formData.append('file', file)
 
-      const data = await res.json()
+          const res = await fetch('/api/admin/importar-extrato', {
+            method: 'POST',
+            body: formData,
+          })
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Erro ao importar arquivo')
+          const data = await res.json()
+
+          if (!res.ok) {
+            throw new Error(data.error || 'Erro ao importar arquivo')
+          }
+
+          uploadedJobIds.push(data.jobId)
+          successCount++
+          setProcessedFiles(i + 1)
+
+        } catch (error: any) {
+          console.error(`Erro ao processar ${file.name}:`, error)
+          errorCount++
+          // Continuar processando os outros arquivos mesmo se um falhar
+        }
       }
 
-      setJobId(data.jobId)
-      setStatus('success')
-      setMessage(`Arquivo enviado com sucesso! Job ID: ${data.jobId}`)
+      setJobIds(uploadedJobIds)
+
+      if (successCount > 0) {
+        setStatus('success')
+        if (errorCount > 0) {
+          setMessage(`${successCount} arquivo(s) enviado(s) com sucesso. ${errorCount} arquivo(s) com erro.`)
+        } else {
+          setMessage(`${successCount} arquivo(s) enviado(s) com sucesso!`)
+        }
+      } else {
+        setStatus('error')
+        setMessage('Nenhum arquivo foi processado com sucesso.')
+      }
       
-      // Limpar arquivo após sucesso
-      setFile(null)
-      
-      // Limpar input
-      const fileInput = document.getElementById('file-input') as HTMLInputElement
-      if (fileInput) fileInput.value = ''
+      // Limpar arquivos após sucesso
+      if (errorCount === 0) {
+        setFiles([])
+        // Limpar input
+        const fileInput = document.getElementById('file-input') as HTMLInputElement
+        if (fileInput) fileInput.value = ''
+      }
 
     } catch (error: any) {
       setStatus('error')
-      setMessage(error.message || 'Erro ao enviar arquivo')
+      setMessage(error.message || 'Erro ao enviar arquivos')
     } finally {
       setUploading(false)
     }
@@ -112,12 +208,21 @@ export default function AdminImportarPage() {
           <CardHeader>
             <CardTitle className="text-white">Upload de Arquivo</CardTitle>
             <CardDescription className="text-gray-400">
-              Formatos suportados: PDF, XLSX, XLS, CSV
+              Formatos suportados: PDF, XLSX, XLS, CSV. Você pode selecionar múltiplos arquivos.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Área de Upload */}
-            <div className="border-2 border-dashed border-gray-700 rounded-lg p-8 text-center hover:border-red-600/50 transition-colors">
+            <div
+              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                isDragging
+                  ? 'border-red-600 bg-red-900/10'
+                  : 'border-gray-700 hover:border-red-600/50'
+              }`}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
               <Upload className="h-12 w-12 text-gray-500 mx-auto mb-4" />
               <input
                 id="file-input"
@@ -126,6 +231,7 @@ export default function AdminImportarPage() {
                 onChange={handleFileChange}
                 className="hidden"
                 disabled={uploading}
+                multiple
               />
               <label
                 htmlFor="file-input"
@@ -139,16 +245,39 @@ export default function AdminImportarPage() {
                 >
                   <span>
                     <FileText className="h-4 w-4 mr-2" />
-                    Selecionar Arquivo
+                    Selecionar Arquivo(s)
                   </span>
                 </Button>
               </label>
-              {file && (
-                <div className="mt-4">
-                  <p className="text-white font-semibold">{file.name}</p>
-                  <p className="text-gray-400 text-sm">
-                    {(file.size / 1024 / 1024).toFixed(2)} MB
+              {files.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  <p className="text-white font-semibold text-sm mb-2">
+                    {files.length} arquivo(s) selecionado(s):
                   </p>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {files.map((file, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-3 bg-black/30 rounded-lg border border-gray-700/50"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white font-medium truncate">{file.name}</p>
+                          <p className="text-gray-400 text-xs">
+                            {(file.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeFile(index)}
+                          disabled={uploading}
+                          className="text-red-400 hover:text-red-300 hover:bg-red-900/20 ml-2 flex-shrink-0"
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -176,18 +305,18 @@ export default function AdminImportarPage() {
             {/* Botão de Upload */}
             <Button
               onClick={handleUpload}
-              disabled={!file || uploading}
+              disabled={files.length === 0 || uploading}
               className="w-full bg-primary hover:bg-primary/90 text-white"
             >
               {uploading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Processando...
+                  Processando {processedFiles}/{files.length} arquivo(s)...
                 </>
               ) : (
                 <>
                   <Upload className="h-4 w-4 mr-2" />
-                  Importar Extrato
+                  Importar {files.length > 0 ? `${files.length} ` : ''}Extrato(s)
                 </>
               )}
             </Button>
@@ -203,17 +332,26 @@ export default function AdminImportarPage() {
         </Card>
 
         {/* Lista de Jobs Recentes */}
-        {jobId && (
+        {jobIds.length > 0 && (
           <Card className="bg-black/50 border-red-600/20 mt-6">
             <CardHeader>
               <CardTitle className="text-white">Status da Importação</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-400">
-                Job ID: <span className="text-white font-mono">{jobId}</span>
+              <p className="text-gray-400 mb-3">
+                {jobIds.length} arquivo(s) enviado(s) para processamento:
               </p>
-              <p className="text-gray-400 mt-2 text-sm">
-                A importação está sendo processada em background. Você pode verificar o status no dashboard.
+              <div className="space-y-2">
+                {jobIds.map((jobId, index) => (
+                  <div key={jobId} className="p-3 bg-black/30 rounded-lg border border-gray-700/50">
+                    <p className="text-gray-400 text-sm">
+                      Arquivo {index + 1} - Job ID: <span className="text-white font-mono">{jobId}</span>
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <p className="text-gray-400 mt-4 text-sm">
+                As importações estão sendo processadas em background. Você pode verificar o status no dashboard.
               </p>
             </CardContent>
           </Card>

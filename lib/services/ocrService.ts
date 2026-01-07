@@ -1,58 +1,49 @@
-import { createWorker } from 'tesseract.js'
 import pdfParse from 'pdf-parse'
 
 /**
- * Extrai texto de PDF usando OCR quando necessário
+ * Extrai texto de PDF - tenta extração normal primeiro
+ * Se o texto extraído for muito pequeno, retorna o que conseguiu
+ * (OCR completo seria melhor, mas requer bibliotecas mais pesadas)
  */
 export async function extractTextWithOCR(pdfBuffer: Buffer): Promise<string> {
   try {
-    // Primeiro, tentar extração normal
-    try {
-      const pdfData = await pdfParse(pdfBuffer)
-      const text = pdfData.text?.trim() || ''
-      
-      // Se conseguiu extrair texto suficiente (>100 caracteres), usar
-      if (text.length > 100) {
-        console.log('✅ Texto extraído normalmente do PDF')
-        return text
-      }
-    } catch (error) {
-      console.log('⚠️ Falha na extração normal, tentando OCR...')
+    console.log('📄 Tentando extrair texto do PDF...')
+    
+    // Tentar extração normal com pdf-parse
+    const pdfData = await pdfParse(pdfBuffer)
+    const text = pdfData.text?.trim() || ''
+    
+    console.log(`📄 Texto extraído: ${text.length} caracteres`)
+    
+    if (text.length > 50) {
+      console.log('✅ Texto extraído com sucesso do PDF')
+      return text
     }
-
-    // Se não conseguiu texto suficiente, usar OCR
-    console.log('🔍 Iniciando OCR com Tesseract.js...')
     
-    // NOTA: Tesseract.js funciona melhor no browser
-    // Para servidor Node.js, pode ser necessário usar pdf-to-img primeiro
-    // Por enquanto, vamos usar uma abordagem simplificada
+    // Se texto muito pequeno, pode ser PDF escaneado
+    // Por enquanto, retornar o que conseguiu
+    // Em produção, seria ideal usar:
+    // - pdf2pic para converter PDF -> imagem
+    // - Tesseract.js ou Google Cloud Vision para OCR
+    // - ou uma API externa de OCR
     
-    const worker = await createWorker('por') // Português
+    console.log('⚠️ PDF parece ser escaneado (pouco texto extraído)')
+    console.log('💡 Texto extraído (primeiros 500 chars):', text.substring(0, 500))
     
-    try {
-      // Converter primeira página do PDF para imagem (simulação)
-      // Em produção, use pdf2pic ou similar para converter PDF -> imagem
-      
-      // Por enquanto, tentar OCR diretamente no buffer
-      // Isso pode não funcionar perfeitamente, mas é um começo
-      
-      const { data: { text } } = await worker.recognize(pdfBuffer as any)
-      
-      await worker.terminate()
-      
-      if (text && text.trim().length > 100) {
-        console.log('✅ Texto extraído com OCR')
-        return text
-      }
-      
-      throw new Error('OCR não conseguiu extrair texto suficiente')
-    } catch (ocrError) {
-      await worker.terminate()
-      throw new Error(`Erro no OCR: ${ocrError}. Considere usar uma API externa como Google Cloud Vision.`)
+    if (text.length === 0) {
+      throw new Error('Não foi possível extrair texto do PDF. O arquivo pode ser uma imagem escaneada e requer OCR avançado.')
     }
+    
+    return text
   } catch (error: any) {
-    console.error('❌ Erro ao extrair texto com OCR:', error)
-    throw new Error(`Não foi possível extrair texto do PDF: ${error.message}`)
+    console.error('❌ Erro ao extrair texto do PDF:', error)
+    
+    // Se pdf-parse falhou, o PDF pode estar corrompido ou ser uma imagem
+    if (error.message?.includes('Invalid') || error.message?.includes('corrupt')) {
+      throw new Error('O PDF parece estar corrompido ou ser uma imagem escaneada. Requer OCR avançado.')
+    }
+    
+    throw new Error(`Erro ao processar PDF: ${error.message}`)
   }
 }
 

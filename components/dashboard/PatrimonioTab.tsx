@@ -131,9 +131,10 @@ export default function PatrimonioTab() {
         patrimonioAcumulado += receitaVenda
       }
       
-      // Patrimônio projetado considera: patrimônio acumulado + valorização do crédito proporcional ao % pago
-      // Quando contemplado, o crédito com INCC aplicado se torna patrimônio
-      const patrimonioProjetado = patrimonioAcumulado + (creditoAtual * (totalPago / (patrimonio.patrimonioBase * 0.1)) * 0.5)
+      // Patrimônio projetado = Crédito valorizado com INCC
+      // O patrimônio final é o valor do crédito corrigido pelo INCC ao longo do tempo
+      // Este é o valor que o cliente terá quando contemplado ou quando finalizar o consórcio
+      const patrimonioProjetado = creditoAtual
 
       // % pago = (total pago / patrimônio base) * 100
       const percentPago = (totalPago / patrimonio.patrimonioBase) * 100
@@ -170,7 +171,8 @@ export default function PatrimonioTab() {
     )
   }
 
-  const patrimonioFinal = projecao[projecao.length - 1]?.patrimonio || patrimonio.valorPago
+  // Patrimônio Final = Patrimônio Projetado (considera crédito valorizado com INCC)
+  const patrimonioFinal = projecao[projecao.length - 1]?.patrimonioProjetado || patrimonio.patrimonioBase
   const totalPagoFinal = projecao[projecao.length - 1]?.totalPago || patrimonio.valorPago
   const percentPagoFinal = projecao[projecao.length - 1]?.percentPago || 0
   const ganhoProjetado = patrimonioFinal - totalPagoFinal
@@ -264,7 +266,7 @@ export default function PatrimonioTab() {
             <p className="text-3xl font-bold text-yellow-500">
               {formatCurrency(patrimonioFinal)}
             </p>
-            <p className="text-xs text-gray-500 mt-1">Projetado para {Math.floor(horizonte / 12)} anos</p>
+            <p className="text-xs text-gray-500 mt-1">Valor do crédito corrigido pelo INCC após {Math.floor(horizonte / 12)} anos</p>
           </CardContent>
         </Card>
       </div>
@@ -325,6 +327,7 @@ export default function PatrimonioTab() {
               <ul className="list-disc list-inside space-y-1 text-gray-400">
                 <li><strong className="text-white">Patrimônio Atual:</strong> Valor já pago (parcelas pagas até agora: {formatCurrency(patrimonio.valorPago)})</li>
                 <li><strong className="text-white">Total Pago:</strong> Soma de todas as parcelas pagas ao longo do tempo</li>
+                <li><strong className="text-white">Patrimônio Final:</strong> Valor do crédito/propatrimônio corrigido pelo INCC ao longo do tempo - representa o valor que você terá quando contemplado</li>
                 <li><strong className="text-white">INCC:</strong> Aplicado anualmente (a cada 12 meses) no crédito e na parcela mensal</li>
                 <li><strong className="text-white">Venda de Cotas:</strong> Simulação de venda de 30% das cotas no mês 60 (5 anos) para fluxo de caixa</li>
                 <li><strong className="text-white">% Pago:</strong> Percentual do patrimônio base que já foi pago</li>
@@ -387,11 +390,11 @@ export default function PatrimonioTab() {
                 <Legend />
                 <Area
                   type="monotone"
-                  dataKey="patrimonio"
+                  dataKey="patrimonioProjetado"
                   fill="url(#colorPatrimonio)"
                   stroke="#DC2626"
                   strokeWidth={3}
-                  name="Patrimônio Acumulado"
+                  name="Patrimônio Final Projetado"
                 />
                 <Area
                   type="monotone"
@@ -403,11 +406,11 @@ export default function PatrimonioTab() {
                 />
                 <Line
                   type="monotone"
-                  dataKey="credito"
-                  stroke="#3B82F6"
+                  dataKey="patrimonio"
+                  stroke="#06B6D4"
                   strokeWidth={2}
                   strokeDasharray="5 5"
-                  name="Crédito (com INCC anual)"
+                  name="Patrimônio Acumulado (Parcelas)"
                 />
                 <Line
                   type="monotone"
@@ -486,10 +489,17 @@ export default function PatrimonioTab() {
                 <Legend />
                 <Line
                   type="monotone"
-                  dataKey="patrimonio"
+                  dataKey="patrimonioProjetado"
                   stroke="#DC2626"
                   strokeWidth={3}
-                  name="Cenário Atual"
+                  name="Patrimônio Final Projetado"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="totalPago"
+                  stroke="#10B981"
+                  strokeWidth={2}
+                  name="Total Pago"
                 />
               </LineChart>
             </ResponsiveContainer>

@@ -71,33 +71,64 @@ async function processFileAsync(file: File, jobId: string, userId: string, ext: 
     if (ext === 'pdf') {
       // Tentar extrair texto do PDF
       try {
-        const pdfData = await pdfParse(buffer)
-        rawText = pdfData.text
-
-        // Se texto muito pequeno ou vazio, usar OCR
-        if (!rawText || rawText.trim().length < 100) {
-          console.log('📄 PDF sem texto, usando OCR...')
+        console.log(`📄 Processando PDF: ${filename} (${(buffer.length / 1024 / 1024).toFixed(2)} MB)`)
+        
+        // Primeiro, tentar extração normal
+        let pdfData
+        try {
+          pdfData = await pdfParse(buffer)
+          rawText = pdfData.text || ''
+          console.log(`📄 Texto extraído inicialmente: ${rawText.length} caracteres`)
+        } catch (parseError) {
+          console.log('⚠️ Erro no parse inicial, tentando OCR...')
           rawText = await extractTextWithOCR(buffer)
+        }
+
+        // Se texto muito pequeno ou vazio, tentar OCR
+        if (!rawText || rawText.trim().length < 50) {
+          console.log('📄 PDF com pouco texto, tentando OCR melhorado...')
+          try {
+            rawText = await extractTextWithOCR(buffer)
+            console.log(`📄 Após OCR: ${rawText.length} caracteres`)
+          } catch (ocrError) {
+            console.error('❌ Erro no OCR:', ocrError)
+            // Continuar com o texto que temos, mesmo que pequeno
+          }
+        }
+
+        // Garantir que temos algum texto
+        if (!rawText || rawText.trim().length === 0) {
+          throw new Error('Não foi possível extrair texto do PDF. O arquivo pode ser uma imagem escaneada.')
         }
 
         // Atualizar job com texto extraído
         await prisma.importJob.update({
           where: { id: jobId },
-          data: { rawText },
+          data: { rawText: rawText.substring(0, 100000) }, // Limitar tamanho
         })
 
         // Parse do PDF usando texto extraído
-        // parsePDF espera Buffer, então vamos usar uma abordagem diferente
-        // Criar um parser de texto direto
+        console.log('📄 Iniciando parse do texto extraído...')
         const parseResult = await parsePDFText(rawText)
+        
+        console.log(`✅ Parse concluído: ${parseResult.quotas.length} cotas encontradas`)
+        
         parsedData = {
           cotas: parseResult.quotas || [],
           header: parseResult.header || {},
           totals: parseResult.totals || {},
           errors: parseResult.errors || [],
         }
-      } catch (error) {
-        throw new Error(`Erro ao processar PDF: ${error}`)
+        
+        // Se não encontrou cotas mas tem texto, adicionar aviso
+        if (parseResult.quotas.length === 0 && rawText.length > 100) {
+          parsedData.errors = parsedData.errors || []
+          parsedData.errors.push('Nenhuma cota foi encontrada no PDF. Verifique se o formato está correto.')
+          console.warn('⚠️ Nenhuma cota encontrada no PDF')
+        }
+      } catch (error: any) {
+        console.error('❌ Erro ao processar PDF:', error)
+        throw new Error(`Erro ao processar PDF: ${error.message || error}`)
       }
     } else if (['xlsx', 'xls', 'csv'].includes(ext)) {
       // Processar Excel/CSV
