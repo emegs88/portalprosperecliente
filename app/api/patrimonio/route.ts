@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { mockDashboardData } from '../dashboard/mock-data'
 
+export const dynamic = 'force-dynamic' // Forçar renderização dinâmica
+
 export async function GET() {
   try {
     const session = await getServerSession(authOptions)
@@ -19,14 +21,19 @@ export async function GET() {
       })
     } catch (dbError) {
       // Retornar dados mock se banco não configurado
-      // Para dados mock, estimar parcelas pagas baseado no percentPago médio
+      // Conforme extrato: parcela total R$ 16.090,30, 4 parcelas pagas
+      // Patrimônio atual = 16.090,30 * 4 = R$ 64.361,20
       const mockQuotas = [
-        { vlBem: 100000, vlParcela: 385, percentPago: 0.0398, pclsPagar: 240, pclsPagas: 3 },
-        { vlBem: 200000, vlParcela: 770, percentPago: 0.0412, pclsPagar: 240, pclsPagas: 4 },
+        { vlBem: 100000, vlParcela: 385.70, percentPago: 0.0000, pclsPagar: 240, pclsPagas: 4 },
+        { vlBem: 100000, vlParcela: 385.70, percentPago: 0.0000, pclsPagar: 240, pclsPagas: 4 },
+        { vlBem: 100000, vlParcela: 385.70, percentPago: 0.0000, pclsPagar: 240, pclsPagas: 4 },
+        { vlBem: 100000, vlParcela: 385.70, percentPago: 0.0000, pclsPagar: 240, pclsPagas: 4 },
+        { vlBem: 100000, vlParcela: 385.70, percentPago: 0.0000, pclsPagar: 240, pclsPagas: 4 },
       ]
       const mockPatrimonioBase = mockQuotas.reduce((sum, q) => sum + q.vlBem, 0)
       const mockAporteMensal = mockQuotas.reduce((sum, q) => sum + q.vlParcela, 0)
-      const mockValorPago = mockQuotas.reduce((sum, q) => sum + (q.pclsPagas * q.vlParcela), 0)
+      // Patrimônio atual = soma de (parcelas pagas * valor parcela) = 4 parcelas * parcela total
+      const mockValorPago = 16090.30 * 4 // R$ 64.361,20
       
       return NextResponse.json({
         patrimonioBase: mockPatrimonioBase,

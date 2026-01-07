@@ -30,6 +30,7 @@ export const realQuotasData = {
       vlParcela: 192.50,
       vlReceber: 50000.00,
       vlQuitacao: 63230.15,
+      tipoBem: 'OUTROS',
     },
     {
       grupo: "000706",
@@ -50,6 +51,7 @@ export const realQuotasData = {
       vlParcela: 385.00,
       vlReceber: 100000.00,
       vlQuitacao: 126467.74,
+      tipoBem: 'OUTROS',
     },
     {
       grupo: "000706",
@@ -70,6 +72,7 @@ export const realQuotasData = {
       vlParcela: 385.00,
       vlReceber: 100000.00,
       vlQuitacao: 126467.74,
+      tipoBem: 'OUTROS',
     },
     {
       grupo: "000706",
@@ -90,6 +93,7 @@ export const realQuotasData = {
       vlParcela: 396.70,
       vlReceber: 100000.00,
       vlQuitacao: 126654.15,
+      tipoBem: 'OUTROS',
     },
     {
       grupo: "000706",
@@ -110,6 +114,7 @@ export const realQuotasData = {
       vlParcela: 385.70,
       vlReceber: 100000.00,
       vlQuitacao: 126447.84,
+      tipoBem: 'OUTROS',
     },
     {
       grupo: "000706",
@@ -130,6 +135,7 @@ export const realQuotasData = {
       vlParcela: 397.50,
       vlReceber: 100000.00,
       vlQuitacao: 126447.69,
+      tipoBem: 'OUTROS',
     },
     {
       grupo: "000706",
@@ -150,6 +156,7 @@ export const realQuotasData = {
       vlParcela: 385.00,
       vlReceber: 100000.00,
       vlQuitacao: 126429.40,
+      tipoBem: 'OUTROS',
     },
     {
       grupo: "000706",
@@ -170,6 +177,7 @@ export const realQuotasData = {
       vlParcela: 385.00,
       vlReceber: 100000.00,
       vlQuitacao: 126667.23,
+      tipoBem: 'OUTROS',
     },
   ],
   totals: {
@@ -219,6 +227,7 @@ export function generateAllQuotas() {
       vlParcela: variacao.parcela,
       vlReceber: 100000.00,
       vlQuitacao: variacao.quitacao,
+      tipoBem: 'OUTROS',
     })
   }
   

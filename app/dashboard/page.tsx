@@ -12,28 +12,26 @@ import PatrimonioTab from '@/components/dashboard/PatrimonioTab'
 import SimulacoesTab from '@/components/dashboard/SimulacoesTab'
 import ProspereVidaTab from '@/components/dashboard/ProspereVidaTab'
 import { Logo } from '@/components/Logo'
+import { LogoutButton } from '@/components/LogoutButton'
 
 export default function DashboardPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
+    setMounted(true)
+  }, [])
+
+  // Redirecionar para login se não autenticado (após montar)
+  useEffect(() => {
+    if (mounted && status === 'unauthenticated') {
       router.push('/login')
-    } else if (status === 'authenticated') {
-      setLoading(false)
     }
-  }, [status, router])
+  }, [mounted, status, router])
 
-  if (loading || status === 'loading') {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white">Carregando...</div>
-      </div>
-    )
-  }
-
+  // Sempre renderizar o dashboard - não bloquear renderização
+  // O NextAuth vai atualizar em background
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
       {/* Header */}
@@ -41,9 +39,12 @@ export default function DashboardPage() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <Logo size="md" />
-            <div className="text-white">
-              <p className="text-sm">{session?.user?.name}</p>
-              <p className="text-xs text-gray-400">{session?.user?.email}</p>
+            <div className="flex items-center gap-4">
+              <div className="text-white">
+                <p className="text-sm">{session?.user?.name || 'Usuário'}</p>
+                <p className="text-xs text-gray-400">{session?.user?.email || 'Carregando...'}</p>
+              </div>
+              <LogoutButton />
             </div>
           </div>
         </div>

@@ -11,8 +11,12 @@
     "vercel-build": "prisma generate && prisma migrate deploy && next build",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
+    "seed": "tsx prisma/seed.ts",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:real": "tsx scripts/import-real-data.ts",
+    "db:seed:rafael": "tsx scripts/seed-rafael.ts",
+    "db:reset-senhas": "tsx scripts/reset-senhas.ts",
+    "db:verificar": "tsx scripts/verificar-dados.ts",
     "db:studio": "prisma studio"
   },
   "dependencies": {
@@ -27,6 +31,7 @@
     "@radix-ui/react-slot": "^1.0.2",
     "@radix-ui/react-tabs": "^1.0.4",
     "bcryptjs": "^2.4.3",
+    "canvas": "^3.2.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
     "date-fns": "^3.0.0",
@@ -34,6 +39,8 @@
     "next": "14.0.4",
     "next-auth": "^4.24.5",
     "pdf-parse": "^1.1.1",
+    "pdf2pic": "^3.2.0",
+    "pdfjs-dist": "^5.4.530",
     "plotly.js": "^2.27.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -41,6 +48,7 @@
     "recharts": "^2.10.3",
     "tailwind-merge": "^2.1.0",
     "tailwindcss-animate": "^1.0.7",
+    "tesseract.js": "^7.0.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

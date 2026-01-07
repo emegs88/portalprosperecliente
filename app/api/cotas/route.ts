@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { generateAllQuotas } from '@/prisma/fixtures/ancora-report-real'
 
+export const dynamic = 'force-dynamic' // Forçar renderização dinâmica
+
 export async function GET() {
   try {
     const session = await getServerSession(authOptions)

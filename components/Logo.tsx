@@ -24,27 +24,38 @@ export function Logo({ className = '', size = 'md' }: LogoProps) {
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
         >
-          {/* Main P body in red */}
+          {/* Main P body in red (#E30613) */}
           <path
-            d="M10 10 L10 90 L55 90 L55 55 L60 55 L60 10 Z"
-            fill="#DC2626"
+            d="M 15 5
+               L 15 95
+               L 50 95
+               Q 65 95 70 85
+               Q 75 75 75 60
+               Q 75 45 70 35
+               Q 65 25 50 25
+               L 45 25
+               L 45 5
+               Z"
+            fill="#E30613"
           />
           
-          {/* White swoosh - curva suave do canto superior direito para inferior esquerdo */}
+          {/* White swoosh - curva dinâmica cortando o P de baixo para cima */}
           <path
-            d="M15 15
-               L 55 15
-               C 57 18, 58 22, 57 26
-               C 56 30, 54 34, 51 38
-               C 48 42, 44 46, 39 50
-               C 34 54, 28 58, 22 62
-               L 15 62
-               L 15 85
-               L 50 85
-               L 50 50
-               C 48 46, 45 42, 41 38
-               C 37 34, 32 30, 26 26
-               C 20 22, 15 18, 15 15
+            d="M 12 75
+               Q 12 70 18 65
+               Q 25 60 32 55
+               Q 40 50 48 45
+               Q 56 40 62 35
+               Q 68 30 72 25
+               Q 76 20 78 15
+               Q 80 10 80 8
+               L 85 8
+               Q 85 12 82 18
+               Q 79 24 74 30
+               Q 69 36 62 42
+               Q 55 48 47 54
+               Q 39 60 30 66
+               Q 21 72 12 78
                Z"
             fill="white"
           />
@@ -56,7 +67,7 @@ export function Logo({ className = '', size = 'md' }: LogoProps) {
         <span className={`${currentSize.text} font-bold text-white tracking-tight`}>
           CONSÓRCIOS
         </span>
-        <span className={`${currentSize.text} font-bold text-primary tracking-tight`}>
+        <span className={`${currentSize.text} font-bold text-[#E30613] tracking-tight`}>
           PROSPERE
         </span>
       </div>

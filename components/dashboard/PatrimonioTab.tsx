@@ -92,26 +92,64 @@ export default function PatrimonioTab() {
     }
 
     const config = cenarios[cenario]
-    const taxaINCCMensal = (config.incc / 100) / 12
-    const aporteTotal = (patrimonio.aporteMensal * config.aporte) + aporteAdicional
+    const taxaINCCAnual = config.incc / 100 // INCC aplicado ANUALMENTE, não mensalmente
+    const aporteMensalBase = patrimonio.aporteMensal * config.aporte
+    const aporteTotal = aporteMensalBase + aporteAdicional
 
     const projecao = []
-    let patrimonioAtual = patrimonio.patrimonioBase
-    let aporteAcumulado = 0
-    let creditoAtual = patrimonio.patrimonioBase
+    
+    // Patrimônio atual = valor já pago (parcelas pagas até agora)
+    let patrimonioAtual = patrimonio.valorPago // Começa com o que já foi pago
+    let totalPago = patrimonio.valorPago // Total já pago
+    let parcelaAtual = patrimonio.aporteMensal // Parcela atual (será reajustada anualmente com INCC)
+    let creditoAtual = patrimonio.patrimonioBase // Crédito atual (será reajustado anualmente com INCC)
+    
+    // Simula possível venda de cotas (ex: 30% das cotas vendidas após 5 anos)
+    const percentVendasCotas = 0.3 // 30% das cotas vendidas após 5 anos
+    const valorVendaPorCota = patrimonio.patrimonioBase / patrimonio.totalCotas
+    const receitaVenda = valorVendaPorCota * (patrimonio.totalCotas * percentVendasCotas)
+    const mesVenda = 60 // Mês 60 (5 anos) quando vende algumas cotas
 
     for (let i = 1; i <= horizonte; i++) {
-      creditoAtual = creditoAtual * (1 + taxaINCCMensal)
-      aporteAcumulado += aporteTotal
-      patrimonioAtual = creditoAtual + aporteAcumulado
+      const anosCompletos = Math.floor(i / 12)
+      const ehAnoCompleto = i % 12 === 0
+      
+      // INCC aplicado ANUALMENTE (a cada 12 meses)
+      if (ehAnoCompleto && anosCompletos > 0) {
+        creditoAtual = creditoAtual * (1 + taxaINCCAnual)
+        parcelaAtual = parcelaAtual * (1 + taxaINCCAnual)
+      }
+      
+      // Aporte mensal (parcela paga)
+      totalPago += aporteTotal
+      
+      // Acumula patrimônio = valor já pago (parcelas pagas)
+      let patrimonioAcumulado = totalPago
+      
+      // Se chegou no mês de venda de cotas, adiciona receita da venda
+      if (i === mesVenda) {
+        patrimonioAcumulado += receitaVenda
+      }
+      
+      // Patrimônio projetado considera: patrimônio acumulado + valorização do crédito proporcional ao % pago
+      // Quando contemplado, o crédito com INCC aplicado se torna patrimônio
+      const patrimonioProjetado = patrimonioAcumulado + (creditoAtual * (totalPago / (patrimonio.patrimonioBase * 0.1)) * 0.5)
+
+      // % pago = (total pago / patrimônio base) * 100
+      const percentPago = (totalPago / patrimonio.patrimonioBase) * 100
+      
+      // % pago para alcançar patrimônio base completo
+      const percentPagoPatrimonio = Math.min(100, percentPago)
 
       projecao.push({
         mes: i,
-        mesLabel: i <= 12 ? `M${i}` : i % 12 === 0 ? `${Math.floor(i / 12)}A` : '',
-        patrimonio: patrimonioAtual,
-        credito: creditoAtual,
-        aporte: aporteAcumulado,
-        ganho: patrimonioAtual - patrimonio.patrimonioBase - aporteAcumulado,
+        mesLabel: i <= 12 ? `M${i}` : i % 12 === 0 ? `${anosCompletos}A` : '',
+        patrimonio: patrimonioAcumulado, // Patrimônio acumulado (parcelas pagas + vendas)
+        patrimonioProjetado, // Projeção considerando crédito valorizado
+        totalPago, // Total já pago até esse mês
+        credito: creditoAtual, // Crédito com INCC anual
+        percentPago: percentPagoPatrimonio, // % pago do patrimônio base
+        parcelaAtual, // Parcela atual (com INCC aplicado anualmente)
       })
     }
 
@@ -132,13 +170,15 @@ export default function PatrimonioTab() {
     )
   }
 
-  const patrimonioFinal = projecao[projecao.length - 1]?.patrimonio || patrimonio.patrimonioBase
-  const ganhoProjetado = patrimonioFinal - patrimonio.patrimonioBase - (projecao.reduce((sum, p) => sum + (patrimonio.aporteMensal + aporteAdicional), 0) || 0)
+  const patrimonioFinal = projecao[projecao.length - 1]?.patrimonio || patrimonio.valorPago
+  const totalPagoFinal = projecao[projecao.length - 1]?.totalPago || patrimonio.valorPago
+  const percentPagoFinal = projecao[projecao.length - 1]?.percentPago || 0
+  const ganhoProjetado = patrimonioFinal - totalPagoFinal
 
   return (
     <div className="space-y-6">
       {/* Cards Resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card className="bg-gradient-to-br from-cyan-500/20 to-cyan-500/5 border-cyan-500/30">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-gray-400 flex items-center gap-2">
@@ -187,14 +227,29 @@ export default function PatrimonioTab() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-gray-400 flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
-              Patrimônio Final
+              Total Pago Projetado
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-blue-500">
-              {formatCurrency(patrimonioFinal)}
+              {formatCurrency(totalPagoFinal)}
             </p>
-            <p className="text-xs text-gray-500 mt-1">Projetado para {Math.floor(horizonte / 12)} anos</p>
+            <p className="text-xs text-gray-500 mt-1">Quanto custará em {Math.floor(horizonte / 12)} anos</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-purple-500/20 to-purple-500/5 border-purple-500/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-gray-400 flex items-center gap-2">
+              <PieChart className="h-4 w-4" />
+              % Pago do Patrimônio
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold text-purple-500">
+              {formatPercent(percentPagoFinal / 100)}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">Percentual do patrimônio base</p>
           </CardContent>
         </Card>
 
@@ -202,14 +257,14 @@ export default function PatrimonioTab() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-gray-400 flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
-              Ganho Projetado
+              Patrimônio Final
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-yellow-500">
-              {formatCurrency(ganhoProjetado)}
+              {formatCurrency(patrimonioFinal)}
             </p>
-            <p className="text-xs text-gray-500 mt-1">Ganho líquido estimado</p>
+            <p className="text-xs text-gray-500 mt-1">Projetado para {Math.floor(horizonte / 12)} anos</p>
           </CardContent>
         </Card>
       </div>
@@ -260,11 +315,30 @@ export default function PatrimonioTab() {
         </CardContent>
       </Card>
 
+      {/* Informações sobre a Projeção */}
+      <Card className="bg-black/50 border-blue-600/30">
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0 w-2 h-2 rounded-full bg-blue-500 mt-2"></div>
+            <div className="text-sm text-gray-300">
+              <p className="font-semibold text-white mb-1">Como funciona a projeção:</p>
+              <ul className="list-disc list-inside space-y-1 text-gray-400">
+                <li><strong className="text-white">Patrimônio Atual:</strong> Valor já pago (parcelas pagas até agora: {formatCurrency(patrimonio.valorPago)})</li>
+                <li><strong className="text-white">Total Pago:</strong> Soma de todas as parcelas pagas ao longo do tempo</li>
+                <li><strong className="text-white">INCC:</strong> Aplicado anualmente (a cada 12 meses) no crédito e na parcela mensal</li>
+                <li><strong className="text-white">Venda de Cotas:</strong> Simulação de venda de 30% das cotas no mês 60 (5 anos) para fluxo de caixa</li>
+                <li><strong className="text-white">% Pago:</strong> Percentual do patrimônio base que já foi pago</li>
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Gráfico Principal: Evolução do Patrimônio */}
       <Card className="bg-black/50 border-red-600/20">
         <CardHeader>
           <CardTitle className="text-white text-lg">Evolução Patrimonial Projetada</CardTitle>
-          <p className="text-sm text-gray-400">Projeção com INCC e aportes mensais</p>
+          <p className="text-sm text-gray-400">Baseado em parcelas pagas + INCC anual + possível venda de cotas</p>
         </CardHeader>
         <CardContent>
           <div className="w-full" style={{ height: '500px' }}>
@@ -274,6 +348,10 @@ export default function PatrimonioTab() {
                   <linearGradient id="colorPatrimonio" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#DC2626" stopOpacity={0.8}/>
                     <stop offset="95%" stopColor="#DC2626" stopOpacity={0.1}/>
+                  </linearGradient>
+                  <linearGradient id="colorTotalPago" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#10B981" stopOpacity={0.1}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#333" />
@@ -286,14 +364,25 @@ export default function PatrimonioTab() {
                   stroke="#999"
                   tickFormatter={(value) => `R$ ${(value / 1000000).toFixed(1)}M`}
                 />
+                <YAxis 
+                  yAxisId="right"
+                  orientation="right"
+                  stroke="#F59E0B"
+                  tickFormatter={(value) => `${value.toFixed(0)}%`}
+                />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: '#1F1F1F',
                     border: '1px solid #DC2626',
                     borderRadius: '8px',
                     color: '#fff',
+                    padding: '12px',
                   }}
-                  formatter={(value: number) => formatCurrency(value)}
+                  formatter={(value: number, name: string) => {
+                    if (name === '% Pago') return `${value.toFixed(2)}%`
+                    return formatCurrency(value)
+                  }}
+                  labelFormatter={(label) => `Mês ${label}`}
                 />
                 <Legend />
                 <Area
@@ -302,7 +391,15 @@ export default function PatrimonioTab() {
                   fill="url(#colorPatrimonio)"
                   stroke="#DC2626"
                   strokeWidth={3}
-                  name="Patrimônio Total"
+                  name="Patrimônio Acumulado"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="totalPago"
+                  fill="url(#colorTotalPago)"
+                  stroke="#10B981"
+                  strokeWidth={2}
+                  name="Total Pago"
                 />
                 <Line
                   type="monotone"
@@ -310,14 +407,15 @@ export default function PatrimonioTab() {
                   stroke="#3B82F6"
                   strokeWidth={2}
                   strokeDasharray="5 5"
-                  name="Crédito (com INCC)"
+                  name="Crédito (com INCC anual)"
                 />
                 <Line
                   type="monotone"
-                  dataKey="aporte"
-                  stroke="#10B981"
+                  dataKey="percentPago"
+                  yAxisId="right"
+                  stroke="#F59E0B"
                   strokeWidth={2}
-                  name="Aporte Acumulado"
+                  name="% Pago do Patrimônio"
                 />
               </ComposedChart>
             </ResponsiveContainer>

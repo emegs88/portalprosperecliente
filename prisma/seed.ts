@@ -4,72 +4,79 @@ import bcrypt from 'bcryptjs'
 const prisma = new PrismaClient()
 
 async function main() {
-  console.log('🌱 Iniciando seed...')
+  console.log('🌱 Iniciando seed do banco de dados...')
 
-  // Criar usuário admin
-  const hashedPassword = await bcrypt.hash('admin123', 10)
+  // Criar usuário ADMIN
+  const adminEmail = 'admin@prospere.com'
+  const adminPassword = 'Admin@12345'
+  const adminHash = await bcrypt.hash(adminPassword, 10)
 
-  const admin = await prisma.user.upsert({
-    where: { email: 'admin@prospere.com.br' },
-    update: {},
-    create: {
-      name: 'Administrador',
-      email: 'admin@prospere.com.br',
-      passwordHash: hashedPassword,
-      clientProfile: {
-        create: {
-          nome: 'Administrador Prospere',
-          documento: '000.000.000-00',
-        },
-      },
-    },
+  const existingAdmin = await prisma.user.findUnique({
+    where: { email: adminEmail },
   })
 
-  console.log('✅ Usuário admin criado:', admin.email)
-
-  // Criar usuário de teste
-  const testUser = await prisma.user.upsert({
-    where: { email: 'cliente@prospere.com.br' },
-    update: {},
-    create: {
-      name: 'Cliente Teste',
-      email: 'cliente@prospere.com.br',
-      passwordHash: await bcrypt.hash('cliente123', 10),
-      clientProfile: {
-        create: {
-          nome: 'Cliente Teste',
-          documento: '111.111.111-11',
-        },
+  if (existingAdmin) {
+    console.log('✅ Admin já existe, atualizando senha...')
+    await prisma.user.update({
+      where: { email: adminEmail },
+      data: { passwordHash: adminHash, role: 'admin' },
+    })
+  } else {
+    console.log('👤 Criando usuário ADMIN...')
+    await prisma.user.create({
+      data: {
+        name: 'Administrador Prospere',
+        email: adminEmail,
+        passwordHash: adminHash,
+        role: 'admin',
       },
-    },
+    })
+  }
+
+  // Criar usuário CLIENT
+  const clientEmail = 'cliente@prospere.com'
+  const clientPassword = 'Cliente@12345'
+  const clientHash = await bcrypt.hash(clientPassword, 10)
+
+  const existingClient = await prisma.user.findUnique({
+    where: { email: clientEmail },
   })
 
-  console.log('✅ Usuário cliente criado:', testUser.email)
-
-  // Criar usuário Rafael (dados reais)
-  const rafael = await prisma.user.upsert({
-    where: { email: 'rafael@prospere.com.br' },
-    update: {},
-    create: {
-      name: 'RAFAEL MARCHIORI CABIDELI',
-      email: 'rafael@prospere.com.br',
-      passwordHash: await bcrypt.hash('rafael123', 10),
-      clientProfile: {
-        create: {
-          nome: 'RAFAEL MARCHIORI CABIDELI',
-          documento: '104.666.137-09',
-        },
+  if (existingClient) {
+    console.log('✅ Cliente já existe, atualizando senha...')
+    await prisma.user.update({
+      where: { email: clientEmail },
+      data: { passwordHash: clientHash, role: 'client' },
+    })
+  } else {
+    console.log('👤 Criando usuário CLIENT...')
+    await prisma.user.create({
+      data: {
+        name: 'Cliente Teste',
+        email: clientEmail,
+        passwordHash: clientHash,
+        role: 'client',
       },
-    },
-  })
+    })
+  }
 
-  console.log('✅ Usuário Rafael criado:', rafael.email)
-  console.log('🎉 Seed concluído!')
+  console.log('✅ Seed concluído com sucesso!')
+  console.log('')
+  console.log('📋 Credenciais criadas:')
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+  console.log('👨‍💼 ADMIN:')
+  console.log('   Email: admin@prospere.com')
+  console.log('   Senha: Admin@12345')
+  console.log('')
+  console.log('👤 CLIENT:')
+  console.log('   Email: cliente@prospere.com')
+  console.log('   Senha: Cliente@12345')
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 }
 
 main()
   .catch((e) => {
-    console.error(e)
+    console.error('❌ Erro ao executar seed:', e)
     process.exit(1)
   })
   .finally(async () => {

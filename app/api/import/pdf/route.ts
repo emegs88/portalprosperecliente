@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { parsePDF } from '@/lib/services/pdfParser'
+import { parsePDF as parsePDFWithOCR } from '@/lib/services/pdfParserWithOCR'
 import { writeFile } from 'fs/promises'
 import path from 'path'
 
@@ -37,38 +38,56 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // Parse PDF
-    const parsed = await parsePDF(buffer)
+    // Parse PDF - primeiro tenta normal, depois OCR se necessário
+    let parsed = await parsePDF(buffer)
+    
+    // Se não encontrou cotas suficientes, tenta com OCR
+    if (parsed.quotas.length === 0) {
+      console.log('⚠️  Nenhuma cota encontrada no modo normal, tentando OCR...')
+      parsed = await parsePDFWithOCR(buffer, true)
+    }
 
     // Salvar quotas
-    const quotasData = parsed.quotas.map(q => ({
-      userId: session.user.id,
-      importBatchId: importBatch.id,
-      administradora: parsed.header.administradora,
-      empresa: parsed.header.empresa,
-      grupo: q.grupo,
-      cota: q.cota,
-      versao: q.versao,
-      dataVenda: q.dataVenda,
-      situacaoCobranca: q.situacaoCobranca,
-      contemplacao: q.contemplacao,
-      percentPago: q.percentPago,
-      percentAtraso: q.percentAtraso,
-      percentFundoComum: q.percentFundoComum,
-      pclsPagar: q.pclsPagar,
-      pclsPagas: q.pclsPagas,
-      pclsPagasEmDia: q.pclsPagasEmDia,
-      pclsPagasAtraso: q.pclsPagasAtraso,
-      pclsEmAtraso: q.pclsEmAtraso,
-      vlBem: q.vlBem,
-      vlParcela: q.vlParcela,
-      vlQuitacao: q.vlQuitacao,
-      vlReceber: q.vlReceber,
-    }))
+    if (parsed.quotas.length > 0) {
+      const quotasData = parsed.quotas.map(q => ({
+        userId: session.user.id,
+        importBatchId: importBatch.id,
+        administradora: parsed.header.administradora || null,
+        empresa: parsed.header.empresa || null,
+        grupo: q.grupo,
+        cota: q.cota,
+        versao: q.versao,
+        dataVenda: q.dataVenda,
+        situacaoCobranca: q.situacaoCobranca,
+        contemplacao: q.contemplacao,
+        percentPago: q.percentPago,
+        percentAtraso: q.percentAtraso,
+        percentFundoComum: q.percentFundoComum,
+        pclsPagar: q.pclsPagar,
+        pclsPagas: q.pclsPagas,
+        pclsPagasEmDia: q.pclsPagasEmDia,
+        pclsPagasAtraso: q.pclsPagasAtraso,
+        pclsEmAtraso: q.pclsEmAtraso,
+        vlBem: q.vlBem,
+        vlParcela: q.vlParcela,
+        vlQuitacao: q.vlQuitacao,
+        vlReceber: q.vlReceber,
+        tipoBem: q.tipoBem || null,
+      }))
 
-    await prisma.quota.createMany({
-      data: quotasData,
-    })
+      // Deletar cotas anteriores deste batch antes de inserir novas
+      await prisma.quota.deleteMany({
+        where: { importBatchId: importBatch.id }
+      })
+
+      await prisma.quota.createMany({
+        data: quotasData,
+      })
+      
+      console.log(`✅ ${parsed.quotas.length} cotas salvas no banco`)
+    } else {
+      console.error('❌ Nenhuma cota para salvar!')
+    }
 
     // Salvar totais
     if (parsed.totals) {
@@ -97,9 +116,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       importBatchId: importBatch.id,
+      quotasImportadas: parsed.quotas.length,
       quotas: parsed.quotas,
       totals: parsed.totals,
       errors: parsed.errors,
+      header: parsed.header,
     })
   } catch (error) {
     console.error('Erro ao importar PDF:', error)
