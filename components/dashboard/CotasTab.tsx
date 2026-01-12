@@ -187,7 +187,14 @@ export default function CotasTab() {
                       </TableCell>
                       <TableCell>
                         <Button
-                          onClick={() => router.push(`/cotas/${quota.id}`)}
+                          onClick={() => {
+                            // Salvar ID da cota no sessionStorage para pré-selecionar no simulador
+                            if (typeof window !== 'undefined') {
+                              sessionStorage.setItem('selectedQuotaId', quota.id)
+                            }
+                            // Redirecionar para dashboard na aba de simulações
+                            router.push('/dashboard?tab=simulacoes')
+                          }}
                           size="sm"
                           variant="outline"
                           className="border-red-600 text-white hover:bg-red-600"

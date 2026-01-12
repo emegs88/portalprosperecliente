@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { formatCurrency, formatPercent } from '@/lib/utils'
+import { formatCurrency, formatCurrencyCompact, formatPercent } from '@/lib/utils'
 import {
   LineChart,
   Line,
@@ -180,93 +180,93 @@ export default function PatrimonioTab() {
   return (
     <div className="space-y-6">
       {/* Cards Resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <Card className="bg-gradient-to-br from-cyan-500/20 to-cyan-500/5 border-cyan-500/30">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <Card className="bg-gradient-to-br from-cyan-500/20 to-cyan-500/5 border-cyan-500/30 overflow-hidden">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-gray-400 flex items-center gap-2">
-              <PieChart className="h-4 w-4" />
-              Patrimônio Atual
+              <PieChart className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Patrimônio Atual</span>
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-cyan-500">
-              {formatCurrency(patrimonio.valorPago)}
+          <CardContent className="min-h-0 overflow-hidden">
+            <p className="text-2xl md:text-xl lg:text-2xl font-bold text-cyan-500 break-words leading-tight">
+              {formatCurrencyCompact(patrimonio.valorPago).replace('R$', '').trim()}
             </p>
-            <p className="text-xs text-gray-500 mt-1">Valor já pago (parcelas)</p>
+            <p className="text-xs text-gray-500 mt-1 line-clamp-2">Valor já pago (parcelas)</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-primary/20 to-primary/5 border-red-600/30">
+        <Card className="bg-gradient-to-br from-primary/20 to-primary/5 border-red-600/30 overflow-hidden">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-gray-400 flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              Patrimônio Base
+              <DollarSign className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Patrimônio Base</span>
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-primary">
-              {formatCurrency(patrimonio.patrimonioBase)}
+          <CardContent className="min-h-0 overflow-hidden">
+            <p className="text-2xl md:text-xl lg:text-2xl font-bold text-primary break-words leading-tight">
+              {formatCurrencyCompact(patrimonio.patrimonioBase).replace('R$', '').trim()}
             </p>
-            <p className="text-xs text-gray-500 mt-1">Soma dos valores do bem</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-green-500/20 to-green-500/5 border-green-500/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-gray-400 flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Aporte Mensal
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-green-500">
-              {formatCurrency(patrimonio.aporteMensal)}
-            </p>
-            <p className="text-xs text-gray-500 mt-1">Parcelas mensais totais</p>
+            <p className="text-xs text-gray-500 mt-1 line-clamp-2">Soma dos valores do bem</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-blue-500/20 to-blue-500/5 border-blue-500/30">
+        <Card className="bg-gradient-to-br from-green-500/20 to-green-500/5 border-green-500/30 overflow-hidden">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-gray-400 flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Total Pago Projetado
+              <TrendingUp className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Aporte Mensal</span>
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-blue-500">
-              {formatCurrency(totalPagoFinal)}
+          <CardContent className="min-h-0 overflow-hidden">
+            <p className="text-2xl md:text-xl lg:text-2xl font-bold text-green-500 break-words leading-tight">
+              {formatCurrencyCompact(patrimonio.aporteMensal).replace('R$', '').trim()}
             </p>
-            <p className="text-xs text-gray-500 mt-1">Quanto custará em {Math.floor(horizonte / 12)} anos</p>
+            <p className="text-xs text-gray-500 mt-1 line-clamp-2">Parcelas mensais totais</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-purple-500/20 to-purple-500/5 border-purple-500/30">
+        <Card className="bg-gradient-to-br from-blue-500/20 to-blue-500/5 border-blue-500/30 overflow-hidden">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-gray-400 flex items-center gap-2">
-              <PieChart className="h-4 w-4" />
-              % Pago do Patrimônio
+              <TrendingUp className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Total Pago Projetado</span>
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-purple-500">
+          <CardContent className="min-h-0 overflow-hidden">
+            <p className="text-2xl md:text-xl lg:text-2xl font-bold text-blue-500 break-words leading-tight">
+              {formatCurrencyCompact(totalPagoFinal).replace('R$', '').trim()}
+            </p>
+            <p className="text-xs text-gray-500 mt-1 line-clamp-2">Quanto custará em {Math.floor(horizonte / 12)} anos</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-purple-500/20 to-purple-500/5 border-purple-500/30 overflow-hidden">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-gray-400 flex items-center gap-2">
+              <PieChart className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">% Pago do Patrimônio</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="min-h-0 overflow-hidden">
+            <p className="text-2xl md:text-xl lg:text-2xl font-bold text-purple-500 break-words leading-tight">
               {formatPercent(percentPagoFinal / 100)}
             </p>
-            <p className="text-xs text-gray-500 mt-1">Percentual do patrimônio base</p>
+            <p className="text-xs text-gray-500 mt-1 line-clamp-2">Percentual do patrimônio base</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-yellow-500/20 to-yellow-500/5 border-yellow-500/30">
+        <Card className="bg-gradient-to-br from-yellow-500/20 to-yellow-500/5 border-yellow-500/30 overflow-hidden">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-gray-400 flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Patrimônio Final
+              <TrendingUp className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Patrimônio Final</span>
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-yellow-500">
-              {formatCurrency(patrimonioFinal)}
+          <CardContent className="min-h-0 overflow-hidden">
+            <p className="text-2xl md:text-xl lg:text-2xl font-bold text-yellow-500 break-words leading-tight">
+              {formatCurrencyCompact(patrimonioFinal).replace('R$', '').trim()}
             </p>
-            <p className="text-xs text-gray-500 mt-1">Valor do crédito corrigido pelo INCC após {Math.floor(horizonte / 12)} anos</p>
+            <p className="text-xs text-gray-500 mt-1 line-clamp-2">Valor do crédito corrigido pelo INCC após {Math.floor(horizonte / 12)} anos</p>
           </CardContent>
         </Card>
       </div>

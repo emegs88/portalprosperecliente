@@ -80,8 +80,12 @@ export default function ImportacoesTab() {
       setResult(data)
       
       if (data.success) {
-        alert(`Importação concluída! ${data.quotas?.length || 0} cotas importadas.`)
+        alert(data.message || `Importação concluída! ${data.quotasImportadas || 0} cotas importadas.`)
         window.location.reload()
+      } else {
+        const errorMsg = data.message || data.error || 'Erro ao importar arquivo'
+        alert(`Erro: ${errorMsg}`)
+        console.error('Erro na importação:', data)
       }
     } catch (error) {
       console.error('Erro ao importar:', error)

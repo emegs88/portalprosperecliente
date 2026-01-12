@@ -11,16 +11,25 @@ import ImportacoesTab from '@/components/dashboard/ImportacoesTab'
 import PatrimonioTab from '@/components/dashboard/PatrimonioTab'
 import SimulacoesTab from '@/components/dashboard/SimulacoesTab'
 import ProspereVidaTab from '@/components/dashboard/ProspereVidaTab'
-import { Logo } from '@/components/Logo'
+import { Logo } from '@/components/logo/Logo'
 import { LogoutButton } from '@/components/LogoutButton'
 
 export default function DashboardPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
+  const [activeTab, setActiveTab] = useState('dashboard')
 
   useEffect(() => {
     setMounted(true)
+    // Verificar query params para definir aba ativa
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const tab = params.get('tab')
+      if (tab) {
+        setActiveTab(tab)
+      }
+    }
   }, [])
 
   // Redirecionar para login se não autenticado (após montar)
@@ -42,7 +51,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-4">
               <div className="text-white">
                 <p className="text-sm">{session?.user?.name || 'Usuário'}</p>
-                <p className="text-xs text-gray-400">{session?.user?.email || 'Carregando...'}</p>
+                <p className="text-xs text-gray-400">Investidor Diamante</p>
               </div>
               <LogoutButton />
             </div>
@@ -52,7 +61,7 @@ export default function DashboardPage() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        <Tabs defaultValue="dashboard" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="bg-black/50 border border-red-600/20">
             <TabsTrigger value="dashboard" className="data-[state=active]:bg-primary">
               Dashboard

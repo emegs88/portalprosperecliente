@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { formatCurrency, formatPercent } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { formatCurrency, formatCurrencyCompact, formatPercent } from '@/lib/utils'
 import {
   LineChart,
   Line,
@@ -21,7 +22,13 @@ import {
   Pie,
   Cell,
 } from 'recharts'
-import { TrendingUp, DollarSign, PieChart as PieChartIcon, ShoppingCart, ArrowUpDown, Building2 } from 'lucide-react'
+import { TrendingUp, DollarSign, PieChart as PieChartIcon, ShoppingCart, ArrowUpDown, Building2, Lightbulb, AlertCircle, Target, TrendingDown, FileText, Settings } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
+import { Slider } from '@/components/ui/slider'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
 
 interface DashboardData {
   totalCotas: number
@@ -81,6 +88,14 @@ interface DashboardData {
     saldo: number
     acumulado: number
   }>
+  importacoes?: Array<{
+    id: string
+    filename: string
+    sourceType: string
+    status: string
+    createdAt: string
+    parsedAt: string | null
+  }>
 }
 
 const COLORS = ['#DC2626', '#EF4444', '#F87171', '#FCA5A5', '#FECACA']
@@ -88,25 +103,38 @@ const COLORS = ['#DC2626', '#EF4444', '#F87171', '#FCA5A5', '#FECACA']
 export default function DashboardTab() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [tipoAnalise, setTipoAnalise] = useState<'todas' | 'oportunidades' | 'alertas' | 'metas'>('todas')
+  
+  // Estados para interatividade do gráfico "Cotas Mais Adiantadas"
+  const [todasCotas, setTodasCotas] = useState<Array<{
+    grupo: string
+    cota: string
+    vlBem: number
+    vlReceber: number
+    percentPago: number
+    pclsPagas: number
+    pclsPagar: number
+    contemplacao: string
+  }>>([])
+  const [cotasSelecionadas, setCotasSelecionadas] = useState<Set<string>>(new Set())
+  const [intervaloInicio, setIntervaloInicio] = useState(0)
+  const [intervaloFim, setIntervaloFim] = useState(5)
+  const [sorteioAtivo, setSorteioAtivo] = useState(false)
+  const [frequenciaSorteio, setFrequenciaSorteio] = useState(6) // meses
+  const [lanceAtivo, setLanceAtivo] = useState(false)
+  const [valorLance, setValorLance] = useState(1000)
+  const [mostrarControles, setMostrarControles] = useState(false)
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        console.log('🔄 DashboardTab - Buscando dados...')
         const res = await fetch('/api/dashboard')
         
         if (!res.ok) {
-          const errorText = await res.text()
-          console.error('❌ DashboardTab - Erro HTTP:', res.status, errorText)
-          throw new Error(`Erro ${res.status}: ${errorText}`)
+          throw new Error(`Erro ${res.status}`)
         }
         
         const data = await res.json()
-        console.log('✅ DashboardTab - Dados recebidos:', {
-          totalCotas: data.totalCotas,
-          totalCredito: data.totalCredito,
-        })
-        
         setData(data)
         setLoading(false)
       } catch (error) {
@@ -132,14 +160,46 @@ export default function DashboardTab() {
             imovel: 0,
             outros: 0,
           },
-          percentPagoMedio: 0,
-          fluxoCaixaMensal: [],
-          administradora: null,
-        })
+    percentPagoMedio: 0,
+    fluxoCaixaMensal: [],
+    administradora: null,
+    importacoes: [],
+  })
       }
     }
     
     loadData()
+  }, [])
+
+  // Buscar todas as cotas para o filtro
+  useEffect(() => {
+    const fetchTodasCotas = async () => {
+      try {
+        const res = await fetch('/api/cotas')
+        const data = await res.json()
+        const cotasFormatadas = (data.quotas || []).map((q: any) => ({
+          grupo: q.grupo,
+          cota: q.cota,
+          vlBem: q.vlBem,
+          vlReceber: q.vlReceber,
+          percentPago: q.percentPago,
+          pclsPagas: q.pclsPagas,
+          pclsPagar: q.pclsPagar,
+          contemplacao: q.contemplacao || '',
+        }))
+        setTodasCotas(cotasFormatadas)
+        
+        // Inicializar seleção com as 5 primeiras (ordenadas por % pago)
+        if (cotasFormatadas.length > 0) {
+          const ordenadas = [...cotasFormatadas].sort((a, b) => b.percentPago - a.percentPago).slice(0, 5)
+          setCotasSelecionadas(new Set(ordenadas.map(q => `${q.grupo}-${q.cota}`)))
+          setIntervaloFim(Math.min(5, cotasFormatadas.length - 1))
+        }
+      } catch (error) {
+        console.error('Erro ao buscar todas as cotas:', error)
+      }
+    }
+    fetchTodasCotas()
   }, [])
   
   // Dados padrão se não houver dados
@@ -184,6 +244,7 @@ export default function DashboardTab() {
     fluxoCaixaMensal,
     patrimonioAcumulado,
     administradora,
+    importacoes,
   } = safeData
 
   // Dados para gráfico de pizza
@@ -193,6 +254,51 @@ export default function DashboardTab() {
     value: q.vlBem,
     color: COLORS[idx % COLORS.length],
   }))
+
+  // Calcular dados do gráfico interativo "Cotas Mais Adiantadas"
+  const calcularDadosGraficoInterativo = () => {
+    if (todasCotas.length === 0) return safeData.cotasMaisAdiantadas || []
+    
+    // Filtrar por intervalo ou seleção
+    let cotasFiltradas = todasCotas
+    if (cotasSelecionadas.size > 0) {
+      cotasFiltradas = todasCotas.filter(q => cotasSelecionadas.has(`${q.grupo}-${q.cota}`))
+    } else {
+      cotasFiltradas = todasCotas.slice(intervaloInicio, intervaloFim + 1)
+    }
+    
+    // Ordenar por % pago (mais adiantadas primeiro)
+    cotasFiltradas = [...cotasFiltradas].sort((a, b) => b.percentPago - a.percentPago)
+    
+    // Aplicar simulações (sorteios e lances)
+    return cotasFiltradas.map(q => {
+      let percentPagoAjustado = q.percentPago
+      let vlReceberAjustado = q.vlReceber
+      
+      // Simular sorteio (aumenta % pago)
+      if (sorteioAtivo && q.percentPago < 100) {
+        const mesesRestantes = (q.pclsPagar - q.pclsPagas)
+        const percentualMensal = 100 / q.pclsPagar
+        const aumentoPorSorteio = percentualMensal * frequenciaSorteio
+        percentPagoAjustado = Math.min(100, percentPagoAjustado + aumentoPorSorteio)
+      }
+      
+      // Simular lance fixo (reduz valor a receber)
+      if (lanceAtivo && q.percentPago < 100) {
+        const reducaoLance = (valorLance / q.vlBem) * 100
+        vlReceberAjustado = Math.max(0, vlReceberAjustado - valorLance)
+        percentPagoAjustado = Math.min(100, percentPagoAjustado + reducaoLance)
+      }
+      
+      return {
+        ...q,
+        percentPago: percentPagoAjustado,
+        vlReceber: vlReceberAjustado,
+      }
+    })
+  }
+  
+  const dadosGraficoInterativo = calcularDadosGraficoInterativo()
 
   return (
     <div className="space-y-6">
@@ -219,71 +325,83 @@ export default function DashboardTab() {
 
       {/* Cards de Resumo - Premium */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <Card className="bg-gradient-to-br from-primary/20 via-primary/10 to-transparent border-red-600/30 hover:border-red-600/50 transition-all hover:shadow-lg hover:shadow-primary/20">
+        <Card className="bg-gradient-to-br from-primary/20 via-primary/10 to-transparent border-red-600/30 hover:border-red-600/50 transition-all hover:shadow-lg hover:shadow-primary/20 overflow-hidden">
           <CardHeader className="pb-3">
-            <CardTitle className="text-white text-xs font-medium text-gray-400 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-gray-400 uppercase tracking-wider">
               Total de Cotas
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-4xl font-bold text-primary mb-1">{safeData.totalCotas}</p>
-            <p className="text-xs text-gray-500">Cotas ativas</p>
+          <CardContent className="min-h-0">
+            <div className="overflow-hidden">
+              <p className="text-3xl md:text-2xl lg:text-3xl font-bold text-primary mb-1 leading-tight break-words">
+                {safeData.totalCotas.toLocaleString('pt-BR')}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Cotas ativas</p>
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-blue-500/20 via-blue-500/10 to-transparent border-blue-500/30 hover:border-blue-500/50 transition-all">
+        <Card className="bg-gradient-to-br from-blue-500/20 via-blue-500/10 to-transparent border-blue-500/30 hover:border-blue-500/50 transition-all hover:shadow-lg hover:shadow-blue-500/20 overflow-hidden">
           <CardHeader className="pb-3">
-            <CardTitle className="text-white text-xs font-medium text-gray-400 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-gray-400 uppercase tracking-wider">
               Total Crédito
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-4xl font-bold text-blue-400 mb-1">
-              {formatCurrency(safeData.totalCredito).replace('R$', '').trim()}
-            </p>
-            <p className="text-xs text-gray-500">Valor total do bem</p>
+          <CardContent className="min-h-0">
+            <div className="overflow-hidden">
+              <p className="text-2xl md:text-xl lg:text-2xl font-bold text-blue-400 mb-1 leading-tight break-words">
+                {formatCurrencyCompact(safeData.totalCredito).replace('R$', '').trim()}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Valor total do bem</p>
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-green-500/20 via-green-500/10 to-transparent border-green-500/30 hover:border-green-500/50 transition-all">
+        <Card className="bg-gradient-to-br from-green-500/20 via-green-500/10 to-transparent border-green-500/30 hover:border-green-500/50 transition-all hover:shadow-lg hover:shadow-green-500/20 overflow-hidden">
           <CardHeader className="pb-3">
-            <CardTitle className="text-white text-xs font-medium text-gray-400 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-gray-400 uppercase tracking-wider">
               Parcela Mensal
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-4xl font-bold text-green-400 mb-1">
-              {formatCurrency(safeData.parcelaMensalTotal).replace('R$', '').trim()}
-            </p>
-            <p className="text-xs text-gray-500">Aporte mensal total</p>
+          <CardContent className="min-h-0">
+            <div className="overflow-hidden">
+              <p className="text-2xl md:text-xl lg:text-2xl font-bold text-green-400 mb-1 leading-tight break-words">
+                {formatCurrencyCompact(safeData.parcelaMensalTotal).replace('R$', '').trim()}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Aporte mensal total</p>
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-yellow-500/20 via-yellow-500/10 to-transparent border-yellow-500/30 hover:border-yellow-500/50 transition-all">
+        <Card className="bg-gradient-to-br from-yellow-500/20 via-yellow-500/10 to-transparent border-yellow-500/30 hover:border-yellow-500/50 transition-all hover:shadow-lg hover:shadow-yellow-500/20 overflow-hidden">
           <CardHeader className="pb-3">
-            <CardTitle className="text-white text-xs font-medium text-gray-400 uppercase tracking-wider">
-              Total a Receber
+            <CardTitle className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+              Patrimônio
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-4xl font-bold text-yellow-400 mb-1">
-              {formatCurrency(safeData.totalReceber).replace('R$', '').trim()}
-            </p>
-            <p className="text-xs text-gray-500">Valor total a receber</p>
+          <CardContent className="min-h-0">
+            <div className="overflow-hidden">
+              <p className="text-2xl md:text-xl lg:text-2xl font-bold text-yellow-400 mb-1 leading-tight break-words">
+                {formatCurrencyCompact(safeData.totalReceber).replace('R$', '').trim()}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Valor investido em parcelas</p>
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-purple-500/20 via-purple-500/10 to-transparent border-purple-500/30 hover:border-purple-500/50 transition-all">
+        <Card className="bg-gradient-to-br from-purple-500/20 via-purple-500/10 to-transparent border-purple-500/30 hover:border-purple-500/50 transition-all hover:shadow-lg hover:shadow-purple-500/20 overflow-hidden">
           <CardHeader className="pb-3">
-            <CardTitle className="text-white text-xs font-medium text-gray-400 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-gray-400 uppercase tracking-wider">
               % Pago Médio
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-4xl font-bold text-purple-400 mb-1">
-              {typeof percentPagoMedio === 'number' ? formatPercent(percentPagoMedio).replace('%', '') : '0%'}
-            </p>
-            <p className="text-xs text-gray-500">Percentual médio pago</p>
+          <CardContent className="min-h-0">
+            <div className="overflow-hidden">
+              <p className="text-3xl md:text-2xl lg:text-3xl font-bold text-purple-400 mb-1 leading-tight">
+                {typeof percentPagoMedio === 'number' ? formatPercent(percentPagoMedio).replace('%', '') : '0'}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Percentual médio pago</p>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -309,7 +427,7 @@ export default function DashboardTab() {
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart
                     data={patrimonioAcumulado}
-                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                    margin={{ top: 10, right: 20, left: 10, bottom: 10 }}
                   >
                     <defs>
                       <linearGradient id="colorAtual" x1="0" y1="0" x2="0" y2="1">
@@ -330,9 +448,14 @@ export default function DashboardTab() {
                     />
                     <YAxis 
                       stroke="#666"
-                      style={{ fontSize: '12px' }}
+                      style={{ fontSize: '11px' }}
                       tick={{ fill: '#999' }}
-                      tickFormatter={(value) => `R$ ${(value / 1000000).toFixed(1)}M`}
+                      width={70}
+                      tickFormatter={(value) => {
+                        if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`
+                        if (value >= 1000) return `${(value / 1000).toFixed(0)}k`
+                        return value.toString()
+                      }}
                     />
                     <Tooltip
                       contentStyle={{
@@ -384,9 +507,17 @@ export default function DashboardTab() {
         <Card className="bg-black/50 border-red-600/20">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-white text-lg font-semibold">
+              <div className="flex-1">
+                <CardTitle className="text-white text-lg font-semibold flex items-center gap-2">
                   🎯 Cotas Mais Adiantadas
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setMostrarControles(!mostrarControles)}
+                    className="h-6 w-6 p-0 text-gray-400 hover:text-white"
+                  >
+                    <Settings className="h-4 w-4" />
+                  </Button>
                 </CardTitle>
                 <p className="text-sm text-gray-400 mt-1">Maior % pago - Próximas da contemplação</p>
               </div>
@@ -394,12 +525,111 @@ export default function DashboardTab() {
             </div>
           </CardHeader>
           <CardContent>
-            {safeData.cotasMaisAdiantadas && safeData.cotasMaisAdiantadas.length > 0 ? (
+            {mostrarControles && (
+              <div className="mb-4 p-4 bg-black/30 rounded-lg border border-red-600/20 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Filtro de Cotas */}
+                  <div className="space-y-2">
+                    <Label className="text-white text-sm">Filtro por Intervalo</Label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-400 w-12">Início:</span>
+                      <Slider
+                        value={[intervaloInicio]}
+                        onValueChange={(value) => {
+                          setIntervaloInicio(value[0])
+                          setCotasSelecionadas(new Set())
+                        }}
+                        max={Math.max(0, todasCotas.length - 1)}
+                        min={0}
+                        step={1}
+                        className="flex-1"
+                      />
+                      <span className="text-xs text-white w-8">{intervaloInicio}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-400 w-12">Fim:</span>
+                      <Slider
+                        value={[intervaloFim]}
+                        onValueChange={(value) => {
+                          setIntervaloFim(value[0])
+                          setCotasSelecionadas(new Set())
+                        }}
+                        max={Math.max(0, todasCotas.length - 1)}
+                        min={intervaloInicio}
+                        step={1}
+                        className="flex-1"
+                      />
+                      <span className="text-xs text-white w-8">{intervaloFim}</span>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Mostrando {Math.max(0, intervaloFim - intervaloInicio + 1)} cotas
+                    </p>
+                  </div>
+                  
+                  {/* Simulação de Sorteios */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        checked={sorteioAtivo}
+                        onCheckedChange={(checked) => setSorteioAtivo(checked as boolean)}
+                        id="sorteio-ativo"
+                      />
+                      <Label htmlFor="sorteio-ativo" className="text-white text-sm cursor-pointer">
+                        Simular Sorteios
+                      </Label>
+                    </div>
+                    {sorteioAtivo && (
+                      <div className="ml-6 space-y-2">
+                        <Label className="text-xs text-gray-400">
+                          Frequência: {frequenciaSorteio} meses
+                        </Label>
+                        <Slider
+                          value={[frequenciaSorteio]}
+                          onValueChange={(value) => setFrequenciaSorteio(value[0])}
+                          min={1}
+                          max={24}
+                          step={1}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Simulação de Lances Fixos */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        checked={lanceAtivo}
+                        onCheckedChange={(checked) => setLanceAtivo(checked as boolean)}
+                        id="lance-ativo"
+                      />
+                      <Label htmlFor="lance-ativo" className="text-white text-sm cursor-pointer">
+                        Lance Fixo Mensal
+                      </Label>
+                    </div>
+                    {lanceAtivo && (
+                      <div className="ml-6 space-y-2">
+                        <Label className="text-xs text-gray-400">Valor do Lance (R$)</Label>
+                        <Input
+                          type="number"
+                          value={valorLance}
+                          onChange={(e) => setValorLance(Number(e.target.value))}
+                          className="bg-black/50 border-red-600/20 text-white h-8"
+                          min={0}
+                          step={100}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {(dadosGraficoInterativo.length > 0 || (safeData.cotasMaisAdiantadas && safeData.cotasMaisAdiantadas.length > 0)) ? (
               <div className="w-full" style={{ minHeight: '400px', height: '400px' }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart
-                    data={safeData.cotasMaisAdiantadas || []}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                    data={dadosGraficoInterativo.length > 0 ? dadosGraficoInterativo : (safeData.cotasMaisAdiantadas || [])}
+                    margin={{ top: 20, right: 20, left: 10, bottom: 60 }}
                   >
                     <defs>
                       <linearGradient id="colorPercentPago" x1="0" y1="0" x2="0" y2="1">
@@ -421,7 +651,8 @@ export default function DashboardTab() {
                       style={{ fontSize: '11px' }}
                       tick={{ fill: '#999' }}
                       tickFormatter={(value, index) => {
-                        const item = safeData.cotasMaisAdiantadas?.[index]
+                        const dados = dadosGraficoInterativo.length > 0 ? dadosGraficoInterativo : (safeData.cotasMaisAdiantadas || [])
+                        const item = dados?.[index]
                         return item ? `${item.grupo}-${value}` : value
                       }}
                     />
@@ -810,6 +1041,304 @@ export default function DashboardTab() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Seção de Análises e Melhorias */}
+      <Card className="bg-black/50 border-red-600/20">
+        <CardHeader>
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-2">
+              <Lightbulb className="h-5 w-5 text-yellow-500" />
+              <CardTitle className="text-white">Análises e Melhorias</CardTitle>
+            </div>
+            <Select value={tipoAnalise} onValueChange={(value: any) => setTipoAnalise(value)}>
+              <SelectTrigger className="w-[200px] bg-black/50 border-red-600/20 text-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-black border-red-600/20">
+                <SelectItem value="todas" className="text-white hover:bg-red-600/20">Todas as Análises</SelectItem>
+                <SelectItem value="oportunidades" className="text-white hover:bg-red-600/20">Oportunidades</SelectItem>
+                <SelectItem value="alertas" className="text-white hover:bg-red-600/20">Alertas</SelectItem>
+                <SelectItem value="metas" className="text-white hover:bg-red-600/20">Metas e Projeções</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {/* Análises de Oportunidades */}
+            {(tipoAnalise === 'todas' || tipoAnalise === 'oportunidades') && (
+              <>
+                {percentPagoMedio && percentPagoMedio < 20 && (
+                  <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <Target className="h-5 w-5 text-green-500 mt-0.5" />
+                      <div className="flex-1">
+                        <h4 className="text-white font-semibold mb-1">Oportunidade: Cotas no Início</h4>
+                        <p className="text-gray-300 text-sm mb-2">
+                          Você está no início das cotas ({formatPercent(percentPagoMedio)} pagas). 
+                          Considere simular cenários de venda e acumulação de patrimônio.
+                        </p>
+                        <p className="text-xs text-gray-400">💡 Acesse a aba "Simulações" para analisar estratégias de venda e investimento.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {cotasEmAtraso && cotasEmAtraso.length > 0 && (
+                  <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="h-5 w-5 text-yellow-500 mt-0.5" />
+                      <div className="flex-1">
+                        <h4 className="text-white font-semibold mb-1">Atenção: Cotas em Atraso</h4>
+                        <p className="text-gray-300 text-sm mb-2">
+                          Você tem {cotasEmAtraso.length} cota(s) com parcelas em atraso. 
+                          Regularize para evitar multas e manter a contemplação em dia.
+                        </p>
+                        <div className="mt-2 space-y-1">
+                          {cotasEmAtraso.slice(0, 3).map((cota, idx) => (
+                            <p key={idx} className="text-xs text-gray-400">
+                              • {cota.grupo} {cota.cota}: {cota.pclsEmAtraso} parcela(s) em atraso
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {cotasMaiorPotencial && cotasMaiorPotencial.length > 0 && (
+                  <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <TrendingUp className="h-5 w-5 text-blue-500 mt-0.5" />
+                      <div className="flex-1">
+                        <h4 className="text-white font-semibold mb-1">Cotas com Maior Potencial</h4>
+                        <p className="text-gray-300 text-sm mb-2">
+                          {cotasMaiorPotencial.length} cota(s) com maior valor relativo a receber. 
+                          Considere estratégias específicas para essas cotas.
+                        </p>
+                        <div className="mt-2 space-y-1">
+                          {cotasMaiorPotencial.slice(0, 3).map((cota, idx) => (
+                            <p key={idx} className="text-xs text-gray-400">
+                              • {cota.grupo} {cota.cota}: {formatCurrency(cota.vlReceber)} a receber ({formatPercent(cota.percentPago)} pago)
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {parcelaMensalTotal > 0 && totalCredito > 0 && (
+                  <div className="p-4 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <DollarSign className="h-5 w-5 text-purple-500 mt-0.5" />
+                      <div className="flex-1">
+                        <h4 className="text-white font-semibold mb-1">Sugestão: Simule Acumulação de Patrimônio</h4>
+                        <p className="text-gray-300 text-sm mb-2">
+                          Com {totalCotas} cota(s) e parcela mensal de {formatCurrency(parcelaMensalTotal)}, 
+                          você pode simular estratégias de acumulação vendendo cotas periodicamente.
+                        </p>
+                        <p className="text-xs text-gray-400">💡 Na aba "Simulações" → "Acumulação", configure contemplações periódicas e veja o patrimônio final.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Alertas */}
+            {(tipoAnalise === 'todas' || tipoAnalise === 'alertas') && (
+              <>
+                {cotasEmAtraso && cotasEmAtraso.length > 0 && (
+                  <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="h-5 w-5 text-red-500 mt-0.5" />
+                      <div className="flex-1">
+                        <h4 className="text-white font-semibold mb-1">⚠️ Ação Necessária: Regularizar Atrasos</h4>
+                        <p className="text-gray-300 text-sm mb-2">
+                          {cotasEmAtraso.length} cota(s) precisa(m) de atenção imediata para evitar penalidades.
+                        </p>
+                        <div className="mt-2 space-y-1">
+                          {cotasEmAtraso.slice(0, 5).map((cota, idx) => (
+                            <p key={idx} className="text-xs text-red-300">
+                              • {cota.grupo} {cota.cota}: {cota.pclsEmAtraso} parcela(s) atrasada(s) - Valor: {formatCurrency(cota.vlParcela * cota.pclsEmAtraso)}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {percentPagoMedio && percentPagoMedio > 80 && (
+                  <div className="p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <TrendingDown className="h-5 w-5 text-orange-500 mt-0.5" />
+                      <div className="flex-1">
+                        <h4 className="text-white font-semibold mb-1">Cotas Próximas do Final</h4>
+                        <p className="text-gray-300 text-sm mb-2">
+                          Você já pagou {formatPercent(percentPagoMedio)} das cotas em média. 
+                          Considere estratégias para as cotas que estão sendo finalizadas.
+                        </p>
+                        <p className="text-xs text-gray-400">💡 Analise opções de venda ou contemplação nas cotas mais adiantadas.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Metas e Projeções */}
+            {(tipoAnalise === 'todas' || tipoAnalise === 'metas') && (
+              <>
+                {patrimonioAcumulado && patrimonioAcumulado.length > 0 && (
+                  <div className="p-4 bg-cyan-500/10 border border-cyan-500/30 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <TrendingUp className="h-5 w-5 text-cyan-500 mt-0.5" />
+                      <div className="flex-1">
+                        <h4 className="text-white font-semibold mb-1">Projeção de Patrimônio</h4>
+                        <p className="text-gray-300 text-sm mb-2">
+                          Baseado nas suas cotas, seu patrimônio projetado (considerando INCC) é de aproximadamente{' '}
+                          {formatCurrency(patrimonioAcumulado[patrimonioAcumulado.length - 1]?.projetado || 0)}.
+                        </p>
+                        <p className="text-xs text-gray-400">💡 Acesse "Patrimônio" para ver projeções detalhadas e simulações.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {totalCredito > 0 && (
+                  <div className="p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <Target className="h-5 w-5 text-indigo-500 mt-0.5" />
+                      <div className="flex-1">
+                        <h4 className="text-white font-semibold mb-1">Meta: Valor Total de Crédito</h4>
+                        <p className="text-gray-300 text-sm mb-2">
+                          Você tem um potencial de crédito total de {formatCurrency(totalCredito)}. 
+                          Com planejamento estratégico, você pode otimizar o uso desses recursos.
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          💡 Use o simulador de acumulação para ver como maximizar seu patrimônio com vendas periódicas.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {distribuicaoStatus && distribuicaoStatus.contempladas > 0 && (
+                  <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <ShoppingCart className="h-5 w-5 text-emerald-500 mt-0.5" />
+                      <div className="flex-1">
+                        <h4 className="text-white font-semibold mb-1">Cotas Contempladas</h4>
+                        <p className="text-gray-300 text-sm mb-2">
+                          Você tem {distribuicaoStatus.contempladas} cota(s) contemplada(s). 
+                          Analise estratégias de venda ou manter aplicado rendendo.
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          💡 Na aba "Simulações" → "Cota Contemplada", veja simulações de manter o crédito aplicado.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Mensagem quando não há análises do tipo selecionado */}
+            {((tipoAnalise === 'oportunidades' && !percentPagoMedio && !cotasEmAtraso?.length && !cotasMaiorPotencial?.length) ||
+              (tipoAnalise === 'alertas' && !cotasEmAtraso?.length && (!percentPagoMedio || percentPagoMedio <= 80)) ||
+              (tipoAnalise === 'metas' && !patrimonioAcumulado?.length && !totalCredito)) && (
+              <div className="p-8 text-center text-gray-400">
+                <Lightbulb className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Nenhuma análise disponível para o filtro selecionado.</p>
+                <p className="text-sm mt-2">Selecione "Todas as Análises" para ver todos os insights.</p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Seção de Extratos Importados */}
+      {importacoes && importacoes.length > 0 && (
+        <Card className="bg-black/50 border-red-600/20">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Extratos Importados
+            </CardTitle>
+            <p className="text-sm text-gray-400 mt-1">
+              Histórico dos extratos que foram cadastrados/importados
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-red-600/30">
+                    <th className="text-left p-3 text-white text-sm font-semibold">Nome do Arquivo</th>
+                    <th className="text-left p-3 text-white text-sm font-semibold">Tipo</th>
+                    <th className="text-left p-3 text-white text-sm font-semibold">Status</th>
+                    <th className="text-left p-3 text-white text-sm font-semibold">Data de Importação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {importacoes.map((importacao) => (
+                    <tr key={importacao.id} className="border-b border-gray-700/30 hover:bg-red-600/10">
+                      <td className="p-3 text-gray-300 text-sm">{importacao.filename}</td>
+                      <td className="p-3">
+                        <span className="px-2 py-1 rounded text-xs font-medium bg-blue-500/20 text-blue-400">
+                          {importacao.sourceType}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-medium ${
+                            importacao.status === 'completed'
+                              ? 'bg-green-500/20 text-green-400'
+                              : importacao.status === 'failed'
+                              ? 'bg-red-500/20 text-red-400'
+                              : importacao.status === 'processing'
+                              ? 'bg-yellow-500/20 text-yellow-400'
+                              : 'bg-gray-500/20 text-gray-400'
+                          }`}
+                        >
+                          {importacao.status === 'completed'
+                            ? 'Concluído'
+                            : importacao.status === 'failed'
+                            ? 'Falhou'
+                            : importacao.status === 'processing'
+                            ? 'Processando'
+                            : importacao.status === 'pending_review'
+                            ? 'Pendente'
+                            : importacao.status}
+                        </span>
+                      </td>
+                      <td className="p-3 text-gray-400 text-sm">
+                        {importacao.parsedAt
+                          ? new Date(importacao.parsedAt).toLocaleDateString('pt-BR', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })
+                          : new Date(importacao.createdAt).toLocaleDateString('pt-BR', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   )

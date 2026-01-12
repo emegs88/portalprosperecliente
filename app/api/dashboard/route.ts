@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { mockDashboardData } from './mock-data'
 
 export const dynamic = 'force-dynamic' // Forçar renderização dinâmica
 
@@ -10,10 +9,7 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions)
 
-    console.log('📊 Dashboard API - Sessão:', session?.user?.email, 'ID:', session?.user?.id)
-
     if (!session?.user?.id) {
-      console.error('❌ Dashboard API - Não autenticado')
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
     }
 
@@ -24,18 +20,31 @@ export async function GET() {
         where: { userId: session.user.id },
         orderBy: { vlBem: 'desc' },
       })
-      console.log(`✅ Dashboard API - Encontradas ${quotas.length} cotas para o usuário`)
     } catch (dbError) {
-      console.error('❌ Dashboard API - Erro no banco:', dbError)
-      // Se der erro no banco, retorna dados mock para desenvolvimento
-      console.log('⚠️ Dashboard API - Usando dados mock')
-      return NextResponse.json(mockDashboardData)
-    }
-
-    // Se não há cotas, retornar dados mock
-    if (quotas.length === 0) {
-      console.log('⚠️ Dashboard API - Nenhuma cota encontrada, usando dados mock')
-      return NextResponse.json(mockDashboardData)
+      // Se der erro no banco, retornar dados vazios
+      return NextResponse.json({
+        totalCotas: 0,
+        totalCredito: 0,
+        parcelaMensalTotal: 0,
+        totalReceber: 0,
+        administradora: null,
+        cotasMaisAdiantadas: [],
+        cotasMaiorPotencial: [],
+        cotasEmAtraso: [],
+        distribuicaoStatus: {
+          contempladas: 0,
+          naoContempladas: 0,
+          emAtraso: 0,
+          emDia: 0,
+        },
+        distribuicaoTipoBem: {
+          imovel: 0,
+          outros: 0,
+        },
+        percentPagoMedio: 0,
+        patrimonioAcumulado: [],
+        fluxoCaixaMensal: [],
+      })
     }
 
     // Buscar perfil do cliente para pegar administradora
@@ -48,15 +57,73 @@ export async function GET() {
       // Ignora erro
     }
 
+    // Buscar import batches (extratos importados) do usuário
+    let importacoes: Array<{
+      id: string
+      filename: string
+      sourceType: string
+      status: string
+      createdAt: Date
+      parsedAt: Date | null
+    }> = []
+    try {
+      importacoes = await prisma.importBatch.findMany({
+        where: { userId: session.user.id },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          filename: true,
+          sourceType: true,
+          status: true,
+          createdAt: true,
+          parsedAt: true,
+        },
+      })
+    } catch (e) {
+      // Ignora erro
+    }
+
+    // Se não há cotas, retornar dados vazios do próprio usuário
+    if (quotas.length === 0) {
+      return NextResponse.json({
+        totalCotas: 0,
+        totalCredito: 0,
+        parcelaMensalTotal: 0,
+        totalReceber: 0,
+        administradora: (clientProfile as any)?.administradora || null,
+        cotasMaisAdiantadas: [],
+        cotasMaiorPotencial: [],
+        cotasEmAtraso: [],
+        distribuicaoStatus: {
+          contempladas: 0,
+          naoContempladas: 0,
+          emAtraso: 0,
+          emDia: 0,
+        },
+        distribuicaoTipoBem: {
+          imovel: 0,
+          outros: 0,
+        },
+        percentPagoMedio: 0,
+        patrimonioAcumulado: [],
+        fluxoCaixaMensal: [],
+      })
+    }
+
     // Pegar administradora da primeira cota ou do perfil
     const administradora = quotas.length > 0 && quotas[0].administradora
       ? quotas[0].administradora
       : (clientProfile as any)?.administradora || null
 
     const totalCotas = quotas.length || 0
+    // Total Crédito = Soma dos valores do bem (vlBem)
     const totalCredito = quotas.length > 0 ? quotas.reduce((sum, q) => sum + q.vlBem, 0) : 0
+    // Parcela Mensal Total = Soma das parcelas mensais (vlParcela)
     const parcelaMensalTotal = quotas.length > 0 ? quotas.reduce((sum, q) => sum + q.vlParcela, 0) : 0
-    const totalReceber = quotas.length > 0 ? quotas.reduce((sum, q) => sum + q.vlReceber, 0) : 0
+    // Patrimônio = Valor investido em parcelas (parcelas pagas * valor da parcela)
+    const totalReceber = quotas.length > 0 
+      ? quotas.reduce((sum, q) => sum + (q.pclsPagas * q.vlParcela), 0) 
+      : 0
 
     // Análises mais relevantes para consórcios
     const cotasMaisAdiantadas = quotas.length > 0
@@ -207,12 +274,36 @@ export async function GET() {
       percentPagoMedio,
       patrimonioAcumulado: patrimonioAcumulado || [],
       fluxoCaixaMensal: fluxoCaixaMensal || [],
+      importacoes: importacoes || [],
       // Mantido para compatibilidade
       topCotas: cotasMaisAdiantadas || [],
     })
   } catch (error) {
     console.error('Erro ao buscar dashboard:', error)
-    // Retorna dados mock em caso de erro para não quebrar a UI
-    return NextResponse.json(mockDashboardData)
+    // Retornar dados vazios em caso de erro (não dados mock de outro cliente)
+    return NextResponse.json({
+      totalCotas: 0,
+      totalCredito: 0,
+      parcelaMensalTotal: 0,
+      totalReceber: 0,
+      administradora: null,
+      cotasMaisAdiantadas: [],
+      cotasMaiorPotencial: [],
+      cotasEmAtraso: [],
+      distribuicaoStatus: {
+        contempladas: 0,
+        naoContempladas: 0,
+        emAtraso: 0,
+        emDia: 0,
+      },
+      distribuicaoTipoBem: {
+        imovel: 0,
+        outros: 0,
+      },
+      percentPagoMedio: 0,
+      patrimonioAcumulado: [],
+      fluxoCaixaMensal: [],
+      importacoes: [],
+    })
   }
 }

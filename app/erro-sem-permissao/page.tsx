@@ -6,7 +6,7 @@ import { useEffect } from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Logo } from '@/components/Logo'
+import { Logo } from '@/components/logo/Logo'
 import { ShieldX, ArrowLeft, Home } from 'lucide-react'
 
 export default function ErroSemPermissaoPage() {

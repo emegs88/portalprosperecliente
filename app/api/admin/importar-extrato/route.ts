@@ -71,7 +71,7 @@ async function processFileAsync(file: File, jobId: string, userId: string, ext: 
     if (ext === 'pdf') {
       // Tentar extrair texto do PDF
       try {
-        console.log(`📄 Processando PDF: ${filename} (${(buffer.length / 1024 / 1024).toFixed(2)} MB)`)
+        console.log(`📄 Processando PDF: ${file.name} (${(buffer.length / 1024 / 1024).toFixed(2)} MB)`)
         
         // Primeiro, tentar extração normal
         let pdfData

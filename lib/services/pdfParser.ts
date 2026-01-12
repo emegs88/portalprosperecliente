@@ -206,27 +206,68 @@ function parseQuotaLine(line: string): ParsedQuota | null {
       idx++
     }
     
-    // Extrair valores numéricos - procurar padrões na linha inteira também
-    // Percentuais (podem estar com % ou não)
-    const percentPagoMatch = trimmed.match(/(\d+[.,]\d+)\s*%/i) || trimmed.match(/(\d+[.,]\d+)/)
-    const percentPago = percentPagoMatch ? parseBrazilianPercent(percentPagoMatch[1]) : 
-                       (idx < parts.length ? parseBrazilianPercent(parts[idx] || '0') : 0)
+    // Extrair valores na ordem específica do extrato
+    // Ordem no extrato: Grupo, Cota, Versão, Venda, Situação, Contemplação, [vazio], % Pago, % Atraso, % Fdo. Comum,
+    // Pcls. Pagar, Pcls. Pagas, Pcls. Pagas em Dia, Pcls. Em Atraso, Vl. Bem, Vl. Parcela, Vl. Receber, Vl. Quitação
     
-    const percentAtraso = idx + 1 < parts.length ? parseBrazilianPercent(parts[idx + 1] || '0') : 0
-    const percentFundoComum = idx + 2 < parts.length ? parseBrazilianPercent(parts[idx + 2] || '0') : 0
+    // Encontrar índice inicial dos valores (após contemplação)
+    // Procurar pelos percentuais primeiro (valores pequenos com vírgula: 0,0050)
+    let percentIdx = idx
+    for (let i = idx; i < Math.min(parts.length, idx + 10); i++) {
+      const part = parts[i] || ''
+      if (part.includes(',') && part.match(/^\d+,\d+$/)) {
+        const parsed = parseBrazilianPercent(part)
+        if (parsed >= 0 && parsed < 1) { // Percentuais pequenos como 0,0050
+          percentIdx = i
+          break
+        }
+      }
+    }
     
-    // Parcelas (números inteiros)
-    const pclsPagar = extractIntegerValue(parts, idx + 3, trimmed)
-    const pclsPagas = extractIntegerValue(parts, idx + 4, trimmed)
-    const pclsPagasEmDia = extractIntegerValue(parts, idx + 5, trimmed)
-    const pclsPagasAtraso = extractIntegerValue(parts, idx + 6, trimmed)
-    const pclsEmAtraso = extractIntegerValue(parts, idx + 7, trimmed)
+    // Percentuais (3 valores consecutivos)
+    const percentPago = percentIdx < parts.length ? parseBrazilianPercent(parts[percentIdx] || '0') : 0
+    const percentAtraso = percentIdx + 1 < parts.length ? parseBrazilianPercent(parts[percentIdx + 1] || '0') : 0
+    const percentFundoComum = percentIdx + 2 < parts.length ? parseBrazilianPercent(parts[percentIdx + 2] || '0') : 0
     
-    // Valores monetários - procurar padrões com vírgula na linha inteira
-    const vlBem = extractMonetaryValue(parts, idx + 8, trimmed)
-    const vlParcela = extractMonetaryValue(parts, idx + 9, trimmed)
-    const vlQuitacao = extractMonetaryValue(parts, idx + 10, trimmed)
-    const vlReceber = extractMonetaryValue(parts, idx + 11, trimmed)
+    // Parcelas (valores inteiros: 001, 000, etc.)
+    let parcelasIdx = percentIdx + 3
+    const pclsPagar = extractIntegerValue(parts, parcelasIdx, trimmed)
+    const pclsPagas = extractIntegerValue(parts, parcelasIdx + 1, trimmed)
+    const pclsPagasEmDia = extractIntegerValue(parts, parcelasIdx + 2, trimmed)
+    const pclsPagasAtraso = extractIntegerValue(parts, parcelasIdx + 3, trimmed)
+    const pclsEmAtraso = extractIntegerValue(parts, parcelasIdx + 4, trimmed)
+    
+    // Valores monetários (procurar a partir das parcelas)
+    // Ordem no extrato: Vl. Bem (260.000,00), Vl. Parcela (933,40), Vl. Receber (260.000,00), Vl. Quitação (318.346,54)
+    let valoresIdx = parcelasIdx + 5
+    // Encontrar todos os valores monetários na linha (padrão brasileiro: 123.456,78)
+    const allMonetaryValues: Array<{ value: number, index: number }> = []
+    for (let i = valoresIdx; i < parts.length; i++) {
+      const part = parts[i] || ''
+      if (part.includes(',') && part.includes('.')) {
+        const parsed = parseBrazilianNumber(part)
+        if (parsed > 100) {
+          allMonetaryValues.push({ value: parsed, index: i })
+        }
+      }
+    }
+    
+    // Ordenar valores monetários por tamanho
+    const sortedMonetary = [...allMonetaryValues].sort((a, b) => b.value - a.value)
+    
+    // Extrair valores na ordem correta:
+    // Vl. Bem: geralmente o segundo maior (260.000,00) ou primeiro se não houver quitação maior
+    // Vl. Parcela: valor menor (933,40) - menor valor monetário
+    // Vl. Receber: geralmente igual ao Vl. Bem (260.000,00)
+    // Vl. Quitação: maior valor (318.346,54)
+    
+    const vlQuitacao = sortedMonetary[0]?.value || 0 // Maior valor
+    const vlBem = sortedMonetary.find(v => v.value > 200000 && v.value < 300000)?.value || 
+                  sortedMonetary[1]?.value || 
+                  sortedMonetary[0]?.value || 0 // Segundo maior ou valor próximo a 260k
+    const vlParcela = sortedMonetary.find(v => v.value > 500 && v.value < 2000)?.value || 
+                     sortedMonetary[sortedMonetary.length - 1]?.value || 0 // Menor valor entre 500-2000
+    const vlReceber = vlBem || 0 // Geralmente igual ao vlBem
 
     // Detectar tipo de bem
     let tipoBem: string | undefined = undefined

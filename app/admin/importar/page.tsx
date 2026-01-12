@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Upload, FileText, CheckCircle2, XCircle, Loader2, ArrowLeft } from 'lucide-react'
-import { Logo } from '@/components/Logo'
+import { Logo } from '@/components/logo/Logo'
 import Link from 'next/link'
 import { LogoutButton } from '@/components/LogoutButton'
 

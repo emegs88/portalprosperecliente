@@ -20,6 +20,22 @@ export function formatPercent(value: number): string {
   }).format(value / 100)
 }
 
+export function formatCurrencyCompact(value: number): string {
+  if (value === 0) return 'R$ 0,00'
+  
+  const absValue = Math.abs(value)
+  
+  if (absValue >= 1_000_000_000) {
+    return `R$ ${(value / 1_000_000_000).toFixed(1).replace('.', ',')} bi`
+  } else if (absValue >= 1_000_000) {
+    return `R$ ${(value / 1_000_000).toFixed(1).replace('.', ',')} mi`
+  } else if (absValue >= 1_000) {
+    return `R$ ${(value / 1_000).toFixed(1).replace('.', ',')} mil`
+  } else {
+    return formatCurrency(value)
+  }
+}
+
 export function parseBrazilianNumber(value: string): number {
   return parseFloat(
     value

@@ -132,44 +132,47 @@ export async function POST(request: NextRequest) {
             let parsed = await parsePDF(buffer)
             console.log(`📄 [${file.name}] Extração normal: ${parsed.quotas.length} cotas encontradas`)
             
-            // Estratégia 2: Se não encontrou cotas, tentar OCR melhorado
+            // Estratégia 2: Se não encontrou cotas, tentar extração direta de texto
             if (parsed.quotas.length === 0) {
-              console.log(`⚠️  [${file.name}] PDF sem cotas, tentando OCR melhorado...`)
-              try {
-                // Extrair texto com OCR melhorado
-                const rawText = await extractTextWithOCR(buffer)
-                console.log(`📄 [${file.name}] Texto extraído com OCR: ${rawText.length} caracteres`)
-                
-                // Parsear o texto extraído
-                parsed = parsePDFText(rawText)
-                console.log(`📄 [${file.name}] Após OCR e parse: ${parsed.quotas.length} cotas encontradas`)
-              } catch (ocrError: any) {
-                console.error(`❌ [${file.name}] Erro no OCR:`, ocrError.message)
-                // Tentar parsePDFWithOCR como fallback
-                try {
-                  parsed = await parsePDFWithOCR(buffer, true)
-                  console.log(`📄 [${file.name}] Após parsePDFWithOCR: ${parsed.quotas.length} cotas encontradas`)
-                } catch (fallbackError) {
-                  console.error(`❌ [${file.name}] Erro no fallback:`, fallbackError)
-                }
-              }
-            }
-            
-            // Estratégia 3: Se ainda não encontrou, tentar extração direta de texto
-            if (parsed.quotas.length === 0) {
-              console.log(`⚠️  [${file.name}] Tentando extração direta de texto...`)
+              console.log(`⚠️  [${file.name}] PDF sem cotas, tentando extração direta de texto...`)
               try {
                 const pdfData = await pdfParse(buffer)
                 const rawText = pdfData.text || ''
+                console.log(`📄 [${file.name}] Texto extraído diretamente: ${rawText.length} caracteres`)
                 
                 if (rawText.length > 50) {
                   parsed = parsePDFText(rawText)
-                  console.log(`📄 [${file.name}] Após extração direta: ${parsed.quotas.length} cotas encontradas`)
+                  console.log(`📄 [${file.name}] Após extração direta e parse: ${parsed.quotas.length} cotas encontradas`)
                 } else {
                   console.log(`⚠️  [${file.name}] Texto muito pequeno (${rawText.length} chars), pode ser PDF escaneado`)
                 }
               } catch (altError: any) {
                 console.error(`❌ [${file.name}] Erro na extração direta:`, altError.message)
+              }
+            }
+            
+            // Estratégia 3: Se ainda não encontrou, tentar OCR melhorado (parsePDFWithOCR)
+            if (parsed.quotas.length === 0) {
+              console.log(`⚠️  [${file.name}] Tentando OCR melhorado (parsePDFWithOCR)...`)
+              try {
+                parsed = await parsePDFWithOCR(buffer, true)
+                console.log(`📄 [${file.name}] Após parsePDFWithOCR: ${parsed.quotas.length} cotas encontradas`)
+              } catch (ocrError: any) {
+                console.error(`❌ [${file.name}] Erro no parsePDFWithOCR:`, ocrError.message)
+                // Última tentativa: extrair texto com extractTextWithOCR
+                try {
+                  const rawText = await extractTextWithOCR(buffer)
+                  console.log(`📄 [${file.name}] Texto extraído com extractTextWithOCR: ${rawText.length} caracteres`)
+                  if (rawText.length > 50) {
+                    parsed = parsePDFText(rawText)
+                    console.log(`📄 [${file.name}] Após extractTextWithOCR e parse: ${parsed.quotas.length} cotas encontradas`)
+                  }
+                } catch (finalError: any) {
+                  console.error(`❌ [${file.name}] Erro final na extração:`, finalError.message)
+                  // Continuar mesmo se não conseguir extrair nada
+                  console.warn(`⚠️  [${file.name}] Nenhuma estratégia funcionou. Continuando sem cotas deste arquivo.`)
+                  parsed = { quotas: [], header: {}, totals: null, errors: [] }
+                }
               }
             }
             

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Slider } from '@/components/ui/slider'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { formatCurrency, formatPercent } from '@/lib/utils'
 import {
   LineChart,
@@ -64,6 +65,15 @@ export default function SimulacoesTab() {
   // Mostrar tela comparativa
   const [mostrarComparativo, setMostrarComparativo] = useState(false)
 
+  // Parâmetros para simulação de acumulação de patrimônio
+  const [intervaloContemplacao, setIntervaloContemplacao] = useState(12) // A cada quantos meses contempla uma cota
+  const [percentualVendaPatrimonio, setPercentualVendaPatrimonio] = useState(30) // % de venda para acumulação
+  const [taxaIntermediacaoPatrimonio, setTaxaIntermediacaoPatrimonio] = useState(5) // % de comissão
+  const [taxaCDIInvestimento, setTaxaCDIInvestimento] = useState(11) // % CDI para investimento do valor de venda
+  const [mesCorte, setMesCorte] = useState(70) // Mês de corte - após isso não vende mais, só contempla
+  const [estrategiaAposCorte, setEstrategiaAposCorte] = useState<'investido' | 'imovel'>('investido') // Estratégia após corte
+  const [percentualCompraImovel, setPercentualCompraImovel] = useState(100) // % do patrimônio para compra de imóvel após corte
+
   useEffect(() => {
     async function loadQuotas() {
       try {
@@ -82,7 +92,15 @@ export default function SimulacoesTab() {
         
         setQuotas(data.quotas || [])
         if (data.quotas && data.quotas.length > 0) {
-          setSelectedQuotaIds([data.quotas[0].id])
+          // Verificar se há um ID de cota salvo no sessionStorage (vindo do botão Simular)
+          const savedQuotaId = typeof window !== 'undefined' ? sessionStorage.getItem('selectedQuotaId') : null
+          if (savedQuotaId && data.quotas.some((q: any) => q.id === savedQuotaId)) {
+            setSelectedQuotaIds([savedQuotaId])
+            // Limpar o sessionStorage após usar
+            sessionStorage.removeItem('selectedQuotaId')
+          } else {
+            setSelectedQuotaIds([data.quotas[0].id])
+          }
         }
         setLoading(false)
         setError(null)
@@ -394,10 +412,218 @@ export default function SimulacoesTab() {
     }
   }
 
+  // Simulação de acumulação de patrimônio com contemplações periódicas e mês de corte
+  const calcularAcumulacaoPatrimonio = (): any => {
+    if (selectedQuotas.length === 0) return null
+    
+    try {
+      const totalVlBem = selectedQuotas.reduce((sum, q) => sum + (q.vlBem || 0), 0)
+      const totalVlParcela = selectedQuotas.reduce((sum, q) => sum + (q.vlParcela || 0), 0)
+      const totalParcelasPagas = selectedQuotas.reduce((sum, q) => sum + (q.pclsPagas || 0), 0)
+      
+      if (!totalVlBem || !totalVlParcela || intervaloContemplacao <= 0) {
+        return null
+      }
+
+      const contemplacoes = []
+      const fluxoCaixa = []
+      const taxaCDIMensal = Math.pow(1 + (taxaCDIInvestimento / 100), 1/12) - 1
+      const taxaINCCAnual = inccData ? (inccData.media12Meses || 6.5) / 100 : 0.065
+      const prazoTotal = 240 // Prazo total do consórcio
+      
+      // OPÇÃO 1: Vender até o corte, usar rendimentos para pagar parcelas
+      let opcao1_totalPago = 0
+      let opcao1_valorInvestido = 0
+      let opcao1_parcelaAtual = totalVlParcela
+      let opcao1_contemplacoesVendidas = 0
+      
+      // OPÇÃO 2: Parcelas após corte + cotas contempladas (crédito aplicado)
+      let opcao2_totalPago = 0
+      let opcao2_valorCreditoAplicado = 0 // Valor dos créditos contemplados após corte
+      let opcao2_parcelaReduzida = totalVlParcela
+      let opcao2_parcelaNormal = 0 // Parcela após contemplação
+      let opcao2_contemplacoesAplicadas = 0
+      let opcao2_parcelasReduzidasPagas = 0
+      
+      // Distribuir cotas ao longo do tempo
+      const numContemplacoes = Math.min(selectedQuotas.length, Math.floor(prazoTotal / intervaloContemplacao))
+      const mesesSimulacao = prazoTotal
+      let indiceCota = 0
+      
+      for (let mes = 1; mes <= mesesSimulacao; mes++) {
+        // Aplicar INCC nas parcelas reduzidas a cada 12 meses
+        if (mes > 1 && mes % 12 === 1) {
+          opcao1_parcelaAtual = opcao1_parcelaAtual * (1 + taxaINCCAnual)
+          opcao2_parcelaReduzida = opcao2_parcelaReduzida * (1 + taxaINCCAnual)
+          if (opcao2_parcelaNormal > 0) {
+            opcao2_parcelaNormal = opcao2_parcelaNormal * (1 + taxaINCCAnual)
+          }
+        }
+        
+        // Verificar contemplação
+        const proximaContemplacao = (indiceCota + 1) * intervaloContemplacao
+        if (indiceCota < numContemplacoes && mes === proximaContemplacao) {
+          const cota = selectedQuotas[indiceCota % selectedQuotas.length]
+          const vlBemCota = cota.vlBem || (totalVlBem / selectedQuotas.length)
+          const vlBemComINCC = calcularValorComINCC(vlBemCota, mes)
+          
+          // OPÇÃO 1: Vender até o corte
+          if (mes <= mesCorte) {
+            const valorVenda = (vlBemComINCC * percentualVendaPatrimonio) / 100
+            const valorIntermediacao = (valorVenda * taxaIntermediacaoPatrimonio) / 100
+            const valorLiquidoVenda = valorVenda - valorIntermediacao
+            opcao1_valorInvestido += valorLiquidoVenda
+            opcao1_contemplacoesVendidas++
+            
+            contemplacoes.push({
+              mes,
+              cota: `${cota.grupo || ''} ${cota.cota || ''}`,
+              vlBemComINCC,
+              valorVenda,
+              valorIntermediacao,
+              valorLiquidoVenda,
+              vendida: true,
+              opcao: 'venda',
+            })
+          } else {
+            // OPÇÃO 2: Após corte, contemplar e aplicar crédito
+            opcao2_valorCreditoAplicado += vlBemComINCC
+            opcao2_contemplacoesAplicadas++
+            
+            // Calcular nova parcela após contemplação
+            // Usa saldo devedor do extrato se disponível, senão calcula
+            const vlReceber = cota.vlReceber || vlBemComINCC
+            const parcelasReduzidasPagasAteAgora = opcao2_parcelasReduzidasPagas
+            // Saldo devedor proporcional: se contemplou antes do prazo atual, reduz proporcionalmente
+            const proporcaoPagas = parcelasReduzidasPagasAteAgora / mes
+            const saldoDevedor = vlReceber * (1 - proporcaoPagas)
+            const prazoRestante = prazoTotal - mes
+            // Nova parcela = saldo devedor / prazo restante, com INCC aplicado
+            opcao2_parcelaNormal = (saldoDevedor / prazoRestante)
+            // Aplicar INCC se já passou mais de 12 meses
+            if (mes > 12) {
+              const anosDecorridos = Math.floor(mes / 12)
+              opcao2_parcelaNormal = opcao2_parcelaNormal * Math.pow(1 + taxaINCCAnual, anosDecorridos)
+            }
+            
+            contemplacoes.push({
+              mes,
+              cota: `${cota.grupo || ''} ${cota.cota || ''}`,
+              vlBemComINCC,
+              valorVenda: 0,
+              valorIntermediacao: 0,
+              valorLiquidoVenda: 0,
+              vendida: false,
+              opcao: 'aplicacao',
+              saldoDevedor,
+              novaParcela: opcao2_parcelaNormal,
+            })
+          }
+          indiceCota++
+        }
+        
+        // Pagar parcelas
+        // OPÇÃO 1: Aplicar rendimento CDI primeiro, depois pagar parcela
+        if (opcao1_valorInvestido > 0) {
+          opcao1_valorInvestido = opcao1_valorInvestido * (1 + taxaCDIMensal)
+        }
+        
+        // Pagar parcela (pode usar dinheiro do investido ou do bolso)
+        if (opcao1_valorInvestido >= opcao1_parcelaAtual) {
+          // Paga com dinheiro do investimento
+          opcao1_valorInvestido -= opcao1_parcelaAtual
+        } else {
+          // Paga parcialmente com investimento, resto do bolso
+          const restoPago = opcao1_parcelaAtual - opcao1_valorInvestido
+          opcao1_valorInvestido = 0
+          opcao1_totalPago += restoPago
+        }
+        
+        // OPÇÃO 2: Pagar parcelas reduzidas até corte, depois parcelas normais
+        if (mes <= mesCorte) {
+          opcao2_totalPago += opcao2_parcelaReduzida
+          opcao2_parcelasReduzidasPagas++
+        } else {
+          // Após corte, paga parcela normal (se já contemplou)
+          if (opcao2_parcelaNormal > 0) {
+            opcao2_totalPago += opcao2_parcelaNormal
+          } else {
+            opcao2_totalPago += opcao2_parcelaReduzida
+          }
+        }
+        
+        // Aplicar CDI no crédito aplicado (opção 2)
+        if (opcao2_valorCreditoAplicado > 0) {
+          opcao2_valorCreditoAplicado = opcao2_valorCreditoAplicado * (1 + taxaCDIMensal)
+        }
+        
+        // Registrar fluxo de caixa
+        if (mes % 3 === 0 || contemplacoes.some(c => c.mes === mes)) {
+          const contemplacaoMes = contemplacoes.find(c => c.mes === mes)
+          fluxoCaixa.push({
+            mes,
+            opcao1_saida: opcao1_parcelaAtual,
+            opcao1_entrada: contemplacaoMes?.vendida ? contemplacaoMes.valorLiquidoVenda : 0,
+            opcao1_totalPago,
+            opcao1_patrimonio: opcao1_valorInvestido - opcao1_totalPago,
+            opcao2_saida: mes <= mesCorte ? opcao2_parcelaReduzida : (opcao2_parcelaNormal || opcao2_parcelaReduzida),
+            opcao2_totalPago,
+            opcao2_patrimonio: opcao2_valorCreditoAplicado - opcao2_totalPago,
+          })
+        }
+      }
+      
+      // Patrimônio final
+      // Opção 1: Saldo que sobrou do investimento após pagar todas as parcelas
+      const opcao1_patrimonioFinal = opcao1_valorInvestido > 0 ? opcao1_valorInvestido : 0
+      
+      // Opção 2: Baseado na estratégia escolhida
+      let opcao2_valorImovel = 0
+      let opcao2_patrimonioFinal = 0
+      
+      if (estrategiaAposCorte === 'investido') {
+        // Se mantém investido, patrimônio é o crédito aplicado rendendo CDI menos total pago
+        opcao2_patrimonioFinal = opcao2_valorCreditoAplicado - opcao2_totalPago
+        opcao2_valorImovel = 0
+      } else {
+        // Se compra imóvel, usa percentual configurado
+        opcao2_valorImovel = opcao2_valorCreditoAplicado * (percentualCompraImovel / 100)
+        opcao2_patrimonioFinal = opcao2_valorImovel - opcao2_totalPago
+      }
+      
+      return {
+        contemplacoes,
+        fluxoCaixa,
+        opcao1: {
+          patrimonioFinal: opcao1_patrimonioFinal,
+          totalPagoFinal: opcao1_totalPago,
+          valorInvestidoFinal: opcao1_valorInvestido,
+          contemplacoesVendidas: opcao1_contemplacoesVendidas,
+        },
+        opcao2: {
+          patrimonioFinal: opcao2_patrimonioFinal,
+          totalPagoFinal: opcao2_totalPago,
+          valorCreditoAplicado: opcao2_valorCreditoAplicado,
+          contemplacoesAplicadas: opcao2_contemplacoesAplicadas,
+          valorParaImovel: estrategiaAposCorte === 'imovel' 
+            ? opcao2_valorCreditoAplicado * (percentualCompraImovel / 100)
+            : 0,
+          estrategia: estrategiaAposCorte,
+        },
+        mesesSimulacao,
+        totalContemplacoes: contemplacoes.length,
+      }
+    } catch (error) {
+      console.error('Erro ao calcular acumulação de patrimônio:', error)
+      return null
+    }
+  }
+
   // Só calcular se temos uma cota selecionada e dados válidos
   let vendaSimulada = null
   let investimentos = null
   let fluxoCaixa: any[] = []
+  let acumulacaoPatrimonio = null
 
   try {
     if (selectedQuotas.length > 0) {
@@ -406,6 +632,7 @@ export default function SimulacoesTab() {
         investimentos = calcularInvestimentosAlternativos()
         fluxoCaixa = calcularFluxoCaixa()
       }
+      acumulacaoPatrimonio = calcularAcumulacaoPatrimonio()
     }
   } catch (error) {
     console.error('Erro ao calcular simulações:', error)
@@ -422,7 +649,7 @@ export default function SimulacoesTab() {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="config" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 bg-black/50 border border-red-600/20">
+            <TabsList className="grid w-full grid-cols-5 bg-black/50 border border-red-600/20">
               <TabsTrigger value="config" className="data-[state=active]:bg-red-600/20 data-[state=active]:text-white">
                 <Settings className="h-4 w-4 mr-2" />
                 Configuração
@@ -439,6 +666,10 @@ export default function SimulacoesTab() {
                 <TrendingUp className="h-4 w-4 mr-2" />
                 Cota Contemplada
               </TabsTrigger>
+              <TabsTrigger value="patrimonio" className="data-[state=active]:bg-red-600/20 data-[state=active]:text-white">
+                <DollarSign className="h-4 w-4 mr-2" />
+                Acumulação
+              </TabsTrigger>
             </TabsList>
 
             {/* Aba: Configuração */}
@@ -448,6 +679,25 @@ export default function SimulacoesTab() {
               <Label className="text-white text-base font-semibold">
                 Selecione uma ou mais Cotas para Simulação
               </Label>
+              
+              {/* Checkbox Selecionar Todas */}
+              <div className="flex items-center gap-2 p-2 bg-black/30 border border-red-600/30 rounded-lg mb-2">
+                <Checkbox
+                  checked={quotas.length > 0 && selectedQuotaIds.length === quotas.length}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setSelectedQuotaIds(quotas.map(q => q.id))
+                    } else {
+                      setSelectedQuotaIds([])
+                    }
+                  }}
+                  className="border-red-600 data-[state=checked]:bg-red-600"
+                />
+                <Label className="text-white font-medium cursor-pointer">
+                  Selecionar Todas ({quotas.length} cotas)
+                </Label>
+              </div>
+
               <div className="max-h-64 overflow-y-auto border border-red-600/30 rounded-lg bg-black/50 p-4 space-y-2">
                 {quotas.map((q) => {
                   const isSelected = selectedQuotaIds.includes(q.id)
@@ -1073,6 +1323,360 @@ export default function SimulacoesTab() {
                   quotas={selectedQuotas}
                   inccData={inccData}
                 />
+              )}
+            </TabsContent>
+
+            {/* Aba: Acumulação de Patrimônio */}
+            <TabsContent value="patrimonio" className="space-y-4 mt-4">
+              {selectedQuotas.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">
+                  <p>Selecione pelo menos uma cota na aba "Configuração" para simular a acumulação de patrimônio.</p>
+                </div>
+              ) : !acumulacaoPatrimonio ? (
+                <div className="text-center py-8 text-gray-400">
+                  <p>Configure os parâmetros abaixo para calcular a simulação de acumulação de patrimônio.</p>
+                </div>
+              ) : (
+                <>
+                  {/* Configurações */}
+                  <Card className="bg-black/50 border-red-600/20">
+                    <CardHeader>
+                      <CardTitle className="text-white">Configurações da Simulação</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-white text-sm">
+                            Intervalo entre Contemplações: {intervaloContemplacao} meses
+                          </Label>
+                          <Input
+                            type="number"
+                            value={intervaloContemplacao}
+                            onChange={(e) => setIntervaloContemplacao(Math.max(1, Number(e.target.value)))}
+                            className="bg-black border-red-600/20 text-white"
+                            min={1}
+                            max={120}
+                          />
+                          <p className="text-xs text-gray-400">A cada quantos meses uma cota é contemplada</p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-white text-sm">
+                            Percentual de Venda: {percentualVendaPatrimonio}%
+                          </Label>
+                          <Slider
+                            value={[percentualVendaPatrimonio]}
+                            onValueChange={([value]) => setPercentualVendaPatrimonio(value)}
+                            min={10}
+                            max={100}
+                            step={5}
+                            className="w-full"
+                          />
+                          <p className="text-xs text-gray-400">% do valor do crédito na venda</p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-white text-sm">
+                            Taxa de Intermediação: {taxaIntermediacaoPatrimonio}%
+                          </Label>
+                          <Slider
+                            value={[taxaIntermediacaoPatrimonio]}
+                            onValueChange={([value]) => setTaxaIntermediacaoPatrimonio(value)}
+                            min={0}
+                            max={10}
+                            step={0.5}
+                            className="w-full"
+                          />
+                          <p className="text-xs text-gray-400">Comissão do representante</p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-white text-sm">
+                            Taxa CDI para Investimento: {taxaCDIInvestimento}% a.a.
+                          </Label>
+                          <Slider
+                            value={[taxaCDIInvestimento]}
+                            onValueChange={([value]) => setTaxaCDIInvestimento(value)}
+                            min={8}
+                            max={15}
+                            step={0.5}
+                            className="w-full"
+                          />
+                          <p className="text-xs text-gray-400">Rendimento do valor de venda</p>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div className="space-y-2">
+                          <Label className="text-white text-sm">
+                            Mês de Corte: {mesCorte} meses
+                          </Label>
+                          <Input
+                            type="number"
+                            value={mesCorte}
+                            onChange={(e) => setMesCorte(Math.max(1, Number(e.target.value)))}
+                            className="bg-black border-red-600/20 text-white"
+                            min={1}
+                            max={240}
+                          />
+                          <p className="text-xs text-gray-400">Após este mês, não vende mais cotas, apenas contempla e aplica crédito</p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-white text-sm">
+                            Estratégia Após Corte (Opção 2)
+                          </Label>
+                          <RadioGroup
+                            value={estrategiaAposCorte}
+                            onValueChange={(value) => setEstrategiaAposCorte(value as 'investido' | 'imovel')}
+                            className="space-y-2"
+                          >
+                            <div className="flex items-center space-x-2 p-3 rounded-lg border border-red-600/30 bg-black/30">
+                              <RadioGroupItem value="investido" id="investido" className="border-red-600 text-red-600" />
+                              <Label htmlFor="investido" className="text-white cursor-pointer flex-1">
+                                <div>
+                                  <p className="font-medium">Manter Investido (100% CDI)</p>
+                                  <p className="text-xs text-gray-400">Crédito fica aplicado rendendo CDI</p>
+                                </div>
+                              </Label>
+                            </div>
+                            <div className="flex items-center space-x-2 p-3 rounded-lg border border-red-600/30 bg-black/30">
+                              <RadioGroupItem value="imovel" id="imovel" className="border-red-600 text-red-600" />
+                              <Label htmlFor="imovel" className="text-white cursor-pointer flex-1">
+                                <div>
+                                  <p className="font-medium">Compra de Imóvel ({percentualCompraImovel}%)</p>
+                                  <p className="text-xs text-gray-400">% do crédito aplicado destinado à compra de imóvel</p>
+                                </div>
+                              </Label>
+                            </div>
+                          </RadioGroup>
+                          {estrategiaAposCorte === 'imovel' && (
+                            <div className="mt-2">
+                              <Slider
+                                value={[percentualCompraImovel]}
+                                onValueChange={([value]) => setPercentualCompraImovel(value)}
+                                min={0}
+                                max={100}
+                                step={5}
+                                className="w-full"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Comparação entre Opções */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Opção 1: Vender até corte */}
+                    <Card className="bg-gradient-to-br from-blue-900/20 to-blue-900/5 border-blue-600/30">
+                      <CardHeader>
+                        <CardTitle className="text-white">Opção 1: Vender até Corte</CardTitle>
+                        <p className="text-sm text-gray-400">Vende cotas contempladas até o mês {mesCorte} e usa rendimentos para pagar parcelas</p>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          <div className="min-w-0 overflow-hidden">
+                            <p className="text-xs md:text-sm text-gray-400 truncate mb-1">Patrimônio Final (Saldo Investido)</p>
+                            <p className="text-2xl md:text-3xl font-bold text-blue-400 break-words overflow-hidden">
+                              {formatCurrency(acumulacaoPatrimonio.opcao1.patrimonioFinal)}
+                            </p>
+                          </div>
+                          <div className="min-w-0 overflow-hidden">
+                            <p className="text-xs md:text-sm text-gray-400 truncate mb-1">Total Pago do Bolso</p>
+                            <p className="text-xl md:text-2xl font-bold text-yellow-400 break-words overflow-hidden">
+                              {formatCurrency(acumulacaoPatrimonio.opcao1.totalPagoFinal)}
+                            </p>
+                          </div>
+                          <div className="min-w-0 overflow-hidden">
+                            <p className="text-xs md:text-sm text-gray-400 truncate mb-1">Contemplações Vendidas</p>
+                            <p className="text-xl md:text-2xl font-bold text-cyan-400">
+                              {acumulacaoPatrimonio.opcao1.contemplacoesVendidas}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Opção 2: Manter crédito aplicado */}
+                    <Card className="bg-gradient-to-br from-green-900/20 to-green-900/5 border-green-600/30">
+                      <CardHeader>
+                        <CardTitle className="text-white">
+                          Opção 2: {estrategiaAposCorte === 'investido' ? 'Manter Crédito Aplicado' : 'Compra de Imóvel'}
+                        </CardTitle>
+                        <p className="text-sm text-gray-400">
+                          {estrategiaAposCorte === 'investido' 
+                            ? 'Contempla após corte e mantém crédito aplicado rendendo CDI, paga parcelas aumentadas'
+                            : `Contempla após corte, usa ${percentualCompraImovel}% do crédito para compra de imóvel, paga parcelas aumentadas`
+                          }
+                        </p>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          {estrategiaAposCorte === 'imovel' && (
+                            <div className="min-w-0 overflow-hidden">
+                              <p className="text-xs md:text-sm text-gray-400 truncate mb-1">Valor Disponível para Imóvel</p>
+                              <p className="text-2xl md:text-3xl font-bold text-green-400 break-words overflow-hidden">
+                                {formatCurrency(acumulacaoPatrimonio.opcao2.valorParaImovel)}
+                              </p>
+                            </div>
+                          )}
+                          {estrategiaAposCorte === 'investido' && (
+                            <div className="min-w-0 overflow-hidden">
+                              <p className="text-xs md:text-sm text-gray-400 truncate mb-1">Crédito Aplicado (Rendendo CDI)</p>
+                              <p className="text-2xl md:text-3xl font-bold text-green-400 break-words overflow-hidden">
+                                {formatCurrency(acumulacaoPatrimonio.opcao2.valorCreditoAplicado)}
+                              </p>
+                            </div>
+                          )}
+                          <div className="min-w-0 overflow-hidden">
+                            <p className="text-xs md:text-sm text-gray-400 truncate mb-1">Total Pago em Parcelas</p>
+                            <p className="text-xl md:text-2xl font-bold text-yellow-400 break-words overflow-hidden">
+                              {formatCurrency(acumulacaoPatrimonio.opcao2.totalPagoFinal)}
+                            </p>
+                          </div>
+                          <div className="min-w-0 overflow-hidden">
+                            <p className="text-xs md:text-sm text-gray-400 truncate mb-1">Contemplações Aplicadas</p>
+                            <p className="text-xl md:text-2xl font-bold text-cyan-400">
+                              {acumulacaoPatrimonio.opcao2.contemplacoesAplicadas}
+                            </p>
+                          </div>
+                          <div className="min-w-0 overflow-hidden">
+                            <p className="text-xs md:text-sm text-gray-400 truncate mb-1">Patrimônio Final</p>
+                            <p className={`text-lg md:text-xl font-bold break-words overflow-hidden ${acumulacaoPatrimonio.opcao2.patrimonioFinal >= 0 ? 'text-purple-400' : 'text-red-400'}`}>
+                              {formatCurrency(acumulacaoPatrimonio.opcao2.patrimonioFinal)}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Tabela de Contemplações */}
+                  {acumulacaoPatrimonio.contemplacoes.length > 0 && (
+                    <Card className="bg-black/50 border-red-600/20">
+                      <CardHeader>
+                        <CardTitle className="text-white">Histórico de Contemplações e Vendas</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="overflow-x-auto">
+                          <table className="w-full border-collapse">
+                            <thead>
+                              <tr className="border-b border-red-600/30">
+                                <th className="text-left p-2 text-white text-sm">Mês</th>
+                                <th className="text-left p-2 text-white text-sm">Cota</th>
+                                <th className="text-right p-2 text-white text-sm">Valor com INCC</th>
+                                <th className="text-right p-2 text-white text-sm">Opção</th>
+                                <th className="text-right p-2 text-white text-sm">Valor Líquido/Parcela</th>
+                                <th className="text-right p-2 text-white text-sm">Nova Parcela</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {acumulacaoPatrimonio.contemplacoes.map((contemplacao: any, idx: number) => (
+                                <tr key={idx} className="border-b border-gray-700/30 hover:bg-red-600/10">
+                                  <td className="p-2 text-gray-300 text-sm">{contemplacao.mes}</td>
+                                  <td className="p-2 text-gray-300 text-sm">{contemplacao.cota}</td>
+                                  <td className="p-2 text-right text-green-400 text-sm">
+                                    {formatCurrency(contemplacao.vlBemComINCC)}
+                                  </td>
+                                  <td className="p-2 text-right text-sm">
+                                    {contemplacao.vendida ? (
+                                      <span className="text-blue-400">Vendida</span>
+                                    ) : (
+                                      <span className="text-green-400">Aplicada</span>
+                                    )}
+                                  </td>
+                                  <td className="p-2 text-right text-cyan-400 text-sm">
+                                    {contemplacao.vendida 
+                                      ? formatCurrency(contemplacao.valorLiquidoVenda)
+                                      : formatCurrency(contemplacao.saldoDevedor || 0)
+                                    }
+                                  </td>
+                                  <td className="p-2 text-right text-yellow-400 text-sm font-semibold">
+                                    {contemplacao.novaParcela ? formatCurrency(contemplacao.novaParcela) : '-'}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Gráfico de Fluxo de Caixa e Patrimônio */}
+                  {acumulacaoPatrimonio.fluxoCaixa.length > 0 && (
+                    <Card className="bg-black/50 border-red-600/20">
+                      <CardHeader>
+                        <CardTitle className="text-white">Evolução do Patrimônio e Fluxo de Caixa</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="w-full" style={{ height: '400px' }}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <ComposedChart data={acumulacaoPatrimonio.fluxoCaixa}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                              <XAxis 
+                                dataKey="mes" 
+                                stroke="#999"
+                                tickFormatter={(value) => `${value}m`}
+                              />
+                              <YAxis 
+                                yAxisId="left"
+                                stroke="#999"
+                                tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                              />
+                              <Tooltip
+                                contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #dc2626' }}
+                                formatter={(value: any) => formatCurrency(value)}
+                              />
+                              <Legend />
+                              <Bar 
+                                yAxisId="left"
+                                dataKey="opcao1_saida" 
+                                fill="#ef4444" 
+                                name="Opção 1 - Saída"
+                                opacity={0.5}
+                              />
+                              <Bar 
+                                yAxisId="left"
+                                dataKey="opcao1_entrada" 
+                                fill="#10b981" 
+                                name="Opção 1 - Entrada"
+                                opacity={0.5}
+                              />
+                              <Bar 
+                                yAxisId="left"
+                                dataKey="opcao2_saida" 
+                                fill="#f59e0b" 
+                                name="Opção 2 - Saída"
+                                opacity={0.5}
+                              />
+                              <Line
+                                yAxisId="left"
+                                type="monotone"
+                                dataKey="opcao1_patrimonio"
+                                stroke="#3b82f6"
+                                strokeWidth={2}
+                                name="Opção 1 - Patrimônio"
+                                dot={false}
+                              />
+                              <Line
+                                yAxisId="left"
+                                type="monotone"
+                                dataKey="opcao2_patrimonio"
+                                stroke="#10b981"
+                                strokeWidth={2}
+                                name="Opção 2 - Patrimônio"
+                                dot={false}
+                              />
+                            </ComposedChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
               )}
             </TabsContent>
           </Tabs>
