@@ -1,5 +1,7 @@
 'use client'
 
+import { Logo } from '@/components/logo/Logo'
+
 export default function HomePage() {
   return (
     <div style={{ 
@@ -13,6 +15,9 @@ export default function HomePage() {
       alignItems: 'center',
       justifyContent: 'center'
     }}>
+      <div style={{ marginBottom: '30px' }}>
+        <Logo size="lg" />
+      </div>
       <h1 style={{ fontSize: '64px', marginBottom: '20px', textAlign: 'center' }}>
         Portal Prospere
       </h1>
