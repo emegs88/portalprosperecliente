@@ -119,20 +119,31 @@ projeto-cliente-prospere/
    - Acesse https://vercel.com/new
    - Importe o repositório: `emegs88/portalprosperecliente`
 
-2. **Configure Variáveis de Ambiente** (Settings → Environment Variables):
+2. **Configure Banco de Dados**
+   - **Opção 1 (Recomendado)**: Vercel Postgres
+     - No painel da Vercel: **Storage** → **Create Database** → **Postgres**
+     - A variável `DATABASE_URL` será criada automaticamente
+   - **Opção 2**: Serviços Externos
+     - Neon (https://neon.tech) - Gratuito
+     - Supabase (https://supabase.com) - Gratuito
+     - Copie a connection string do seu banco
+
+3. **Configure Variáveis de Ambiente** (Settings → Environment Variables):
    ```
    DATABASE_URL=postgresql://usuario:senha@host:5432/database?schema=public
    NEXTAUTH_URL=https://seu-projeto.vercel.app
    NEXTAUTH_SECRET=sua-chave-secreta-aleatoria-aqui
    NODE_ENV=production
    ```
+   ⚠️ **IMPORTANTE**: Se usar Vercel Postgres, a `DATABASE_URL` já estará configurada automaticamente.
 
-3. **Banco de Dados PostgreSQL**
-   - **Opção 1 (Recomendado)**: Adicione "Vercel Postgres" como addon no projeto
-   - **Opção 2**: Use Neon (https://neon.tech) ou Supabase (https://supabase.com) gratuitamente
+4. **Execute Migrações**
+   - As migrações são executadas automaticamente durante o build (ver `vercel.json`)
+   - Ou execute manualmente: `npx prisma migrate deploy`
 
-4. **Deploy Automático**
+5. **Deploy Automático**
    - A Vercel detecta automaticamente o Next.js
+   - O build executa: `prisma generate && prisma migrate deploy && next build`
    - O build roda automaticamente com `prisma generate && prisma migrate deploy && next build`
 
 5. **Após o Deploy**
