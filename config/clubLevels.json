@@ -82,8 +82,8 @@
     }
   ],
   "eligibilityRules": {
-    "calculationMethod": "totalCredit", // totalCredit, paidCredit, activeCredit
-    "updateFrequency": "monthly", // daily, weekly, monthly
-    "gracePeriod": 30 // dias de graça antes de perder nível
+    "calculationMethod": "totalCredit",
+    "updateFrequency": "monthly",
+    "gracePeriod": 30
   }
 }

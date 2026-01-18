@@ -11,6 +11,7 @@ import { PatrimonioTab } from '@/components/dashboard/PatrimonioTab'
 import { ProspereVidaTab } from '@/components/dashboard/ProspereVidaTab'
 import { SimulacoesTab } from '@/components/dashboard/SimulacoesTab'
 import { PlanoCarreiraTab } from '@/components/dashboard/PlanoCarreiraTab'
+import { ProspereClubTab } from '@/components/dashboard/ProspereClubTab'
 import { BrandHeader } from '@/components/BrandHeader'
 import { LogoutButton } from '@/components/LogoutButton'
 
@@ -52,8 +53,9 @@ export default function DashboardPage() {
           <LogoutButton />
         </div>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-7 bg-gray-800">
+          <TabsList className="grid w-full grid-cols-8 bg-gray-800">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+            <TabsTrigger value="prospere-club">Prospere Club</TabsTrigger>
             <TabsTrigger value="cotas">Cotas</TabsTrigger>
             <TabsTrigger value="importacoes">Importações</TabsTrigger>
             <TabsTrigger value="patrimonio">Patrimônio</TabsTrigger>
@@ -63,6 +65,9 @@ export default function DashboardPage() {
           </TabsList>
           <TabsContent value="dashboard" className="mt-6">
             <DashboardTab />
+          </TabsContent>
+          <TabsContent value="prospere-club" className="mt-6">
+            <ProspereClubTab />
           </TabsContent>
           <TabsContent value="cotas" className="mt-6">
             <CotasTab />

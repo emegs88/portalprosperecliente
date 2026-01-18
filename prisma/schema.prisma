@@ -1,5 +1,5 @@
-// Prisma Schema - VERSÃO TURBO
-// Simulador de Acúmulo de Patrimônio via Consórcio
+// Prisma Schema - PLATAFORMA SAAS PROSPERE COMPLETA
+// Portal Premium de Experiências, Benefícios e Acúmulo Patrimonial
 
 generator client {
   provider = "prisma-client-js"
@@ -19,23 +19,37 @@ model User {
   email         String    @unique
   name          String?
   passwordHash  String?
-  role          String    @default("USER") // USER | ADMIN
-  emailVerified DateTime?
   image         String?
+  role          String    @default("CLIENTE") // CLIENTE, VENDEDOR, PARCEIRO, LIDER, ADMIN, FINANCEIRO
+  emailVerified DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  // Relacionamentos NextAuth
+  // NextAuth
   accounts Account[]
   sessions Session[]
 
-  // Relacionamentos do sistema
+  // Relacionamentos
   clientProfile ClientProfile?
-  importBatches ImportBatch[]
+  sellerProfile SellerProfile?
+  teamLeader    Team[]            @relation("TeamLeader")
+  sellerLeaders SellerProfile[]   @relation("SellerLeader")
+  clientSales   Sale[]            @relation("ClientSales")
+  sellerSales   Sale[]            @relation("SellerSales")
+  partnerSales  Sale[]            @relation("PartnerSales")
+  commissions   CommissionEntry[]
+  payouts       Payout[]          @relation("UserPayouts")
+  clubLevels    UserClubLevel[]
+  reservations  Reservation[]
+  badges        UserBadge[]
   quotas        Quota[]
   simulations   Simulation[]
+  importBatches ImportBatch[]
+  auditLogs     AuditLog[]
 
   @@index([email])
+  @@index([role])
+  @@map("users")
 }
 
 model Account {
@@ -80,78 +94,321 @@ model VerificationToken {
 }
 
 // ============================================
-// PERFIL DO CLIENTE
+// PERFIS
 // ============================================
 
 model ClientProfile {
+  id                String    @id @default(cuid())
+  userId            String    @unique
+  cpf               String?
+  phone             String?
+  birthDate         DateTime?
+  address           String?
+  patrimonyEstimate Float     @default(0)
+  currentLevelId    String?
+  achievedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clubLevel ClubLevel? @relation(fields: [currentLevelId], references: [id])
+  quotas    Quota[]
+
+  @@index([currentLevelId])
+  @@map("client_profiles")
+}
+
+model SellerProfile {
   id             String   @id @default(cuid())
   userId         String   @unique
-  nome           String
-  documento      String
-  administradora String?
-  empresa        String?
+  cpf            String?
+  phone          String?
+  leaderId       String?
+  teamId         String?
+  commissionRate Float    @default(0)
+  isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leader User?  @relation("SellerLeader", fields: [leaderId], references: [id])
+  team   Team?  @relation(fields: [teamId], references: [id])
+  sales  Sale[]
+
+  @@index([leaderId])
+  @@index([teamId])
+  @@map("seller_profiles")
+}
+
+model Team {
+  id          String   @id @default(cuid())
+  name        String
+  leaderId    String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  leader  User            @relation("TeamLeader", fields: [leaderId], references: [id])
+  sellers SellerProfile[]
+
+  @@index([leaderId])
+  @@map("teams")
 }
 
 // ============================================
-// COTAS
+// CLUBE DE BENEFÍCIOS
+// ============================================
+
+model ClubLevel {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  displayName  String
+  minCreditBRL Float    @default(0)
+  maxCreditBRL Float?
+  color        String
+  icon         String?
+  description  String?
+  benefits     String
+  rules        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  clients      ClientProfile[]
+  members      UserClubLevel[]
+  experiences  Experience[]
+  reservations Reservation[]
+
+  @@index([minCreditBRL])
+  @@map("club_levels")
+}
+
+model UserClubLevel {
+  id          String    @id @default(cuid())
+  userId      String
+  clubLevelId String
+  creditBRL   Float     @default(0)
+  achievedAt  DateTime  @default(now())
+  expiresAt   DateTime?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clubLevel ClubLevel @relation(fields: [clubLevelId], references: [id])
+
+  @@unique([userId, clubLevelId, achievedAt])
+  @@index([userId])
+  @@index([clubLevelId])
+  @@map("user_club_levels")
+}
+
+// ============================================
+// EXPERIÊNCIAS / EVENTOS
+// ============================================
+
+model Experience {
+  id               String   @id @default(cuid())
+  slug             String   @unique
+  title            String
+  description      String?
+  longDescription  String?
+  imageUrl         String?
+  gallery          String?
+  videoUrl         String?
+  location         String?
+  address          String?
+  category         String?
+  tags             String?
+  status           String   @default("active")
+  eligibilityRules String?
+  benefits         String?
+  metadata         String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  clubLevelId  String?
+  clubLevel    ClubLevel?       @relation(fields: [clubLevelId], references: [id])
+  dates        ExperienceDate[]
+  reservations Reservation[]
+  badges       Badge[]
+
+  @@index([slug])
+  @@index([status])
+  @@index([category])
+  @@map("experiences")
+}
+
+model ExperienceDate {
+  id              String   @id @default(cuid())
+  experienceId    String
+  date            DateTime
+  time            String?
+  maxCapacity     Int
+  capacityByLevel String?
+  availableSlots  Int
+  price           Float    @default(0)
+  status          String   @default("active")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  experience   Experience    @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  reservations Reservation[]
+
+  @@index([experienceId])
+  @@index([date])
+  @@map("experience_dates")
+}
+
+model Reservation {
+  id               String    @id @default(cuid())
+  userId           String
+  experienceId     String
+  experienceDateId String
+  clubLevelId      String
+  status           String    @default("pending")
+  guestCount       Int       @default(1)
+  maxGuests        Int       @default(1)
+  qrCode           String?   @unique
+  qrCodeImage      String?
+  reservationDate  DateTime?
+  checkInAt        DateTime?
+  checkOutAt       DateTime?
+  notes            String?
+  metadata         String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  experience Experience     @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  date       ExperienceDate @relation(fields: [experienceDateId], references: [id], onDelete: Cascade)
+  clubLevel  ClubLevel      @relation(fields: [clubLevelId], references: [id])
+  guests     Guest[]
+  badges     UserBadge[]
+
+  @@index([userId])
+  @@index([experienceId])
+  @@index([experienceDateId])
+  @@index([status])
+  @@index([qrCode])
+  @@map("reservations")
+}
+
+model Guest {
+  id            String    @id @default(cuid())
+  reservationId String
+  name          String
+  email         String?
+  phone         String?
+  cpf           String?
+  birthDate     DateTime?
+  isLead        Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  @@index([reservationId])
+  @@map("guests")
+}
+
+// ============================================
+// GAMIFICAÇÃO
+// ============================================
+
+model Badge {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  displayName  String
+  description  String?
+  icon         String?
+  category     String?
+  criteria     String
+  experienceId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  experience Experience? @relation(fields: [experienceId], references: [id])
+  users      UserBadge[]
+
+  @@index([category])
+  @@map("badges")
+}
+
+model UserBadge {
+  id            String   @id @default(cuid())
+  userId        String
+  badgeId       String
+  reservationId String?
+  achievedAt    DateTime @default(now())
+  metadata      String?
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge       Badge        @relation(fields: [badgeId], references: [id])
+  reservation Reservation? @relation(fields: [reservationId], references: [id])
+
+  @@unique([userId, badgeId])
+  @@index([userId])
+  @@index([badgeId])
+  @@map("user_badges")
+}
+
+// ============================================
+// COTAS E PATRIMÔNIO
 // ============================================
 
 model Quota {
-  id                String      @id @default(cuid())
+  id                String   @id @default(cuid())
   userId            String
-  importBatchId     String
+  clientProfileId   String?
+  importBatchId     String?
   administradora    String?
   empresa           String?
   grupo             String
   cota              String
   versao            String
-  dataVenda         String
+  dataVenda         String?
   situacaoCobranca  String
   contemplacao      String
-  percentPago       Float       @default(0)
-  percentAtraso     Float       @default(0)
-  percentFundoComum Float       @default(0)
-  pclsPagar         Int         @default(0)
-  pclsPagas         Int         @default(0)
-  pclsPagasEmDia    Int         @default(0)
-  pclsPagasAtraso   Int         @default(0)
-  pclsEmAtraso      Int         @default(0)
-  vlBem             Float       @default(0)
-  vlParcela         Float       @default(0)
-  vlQuitacao        Float       @default(0)
-  vlReceber         Float       @default(0)
+  percentPago       Float    @default(0)
+  percentAtraso     Float    @default(0)
+  percentFundoComum Float    @default(0)
+  pclsPagar         Int      @default(0)
+  pclsPagas         Int      @default(0)
+  pclsPagasEmDia    Int      @default(0)
+  pclsPagasAtraso   Int      @default(0)
+  pclsEmAtraso      Int      @default(0)
+  vlBem             Float    @default(0)
+  vlParcela         Float    @default(0)
+  vlQuitacao        Float    @default(0)
+  vlReceber         Float    @default(0)
   tipoBem           String?
-  needsReview       Boolean     @default(false)
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  importBatch       ImportBatch @relation(fields: [importBatchId], references: [id], onDelete: Cascade)
+  needsReview       Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientProfile ClientProfile? @relation(fields: [clientProfileId], references: [id])
+  importBatch   ImportBatch?   @relation(fields: [importBatchId], references: [id])
+  sales         Sale[]
 
   @@index([userId])
-  @@index([importBatchId])
+  @@index([clientProfileId])
   @@index([grupo, cota])
   @@map("quotas")
 }
 
-// ============================================
-// IMPORTAÇÕES
-// ============================================
-
 model ImportBatch {
-  id         String        @id @default(cuid())
+  id         String    @id @default(cuid())
   userId     String
-  sourceType String        @default("PDF")
+  sourceType String    @default("PDF")
   filename   String
   status     String
   parsedAt   DateTime?
-  createdAt  DateTime      @default(now())
+  createdAt  DateTime  @default(now())
   errorsJson String?
-  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  quotas     Quota[]
-  totals     ImportTotals?
+
+  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quotas Quota[]
+  totals ImportTotals?
 
   @@index([userId])
   @@map("import_batches")
@@ -169,7 +426,7 @@ model ImportTotals {
 }
 
 // ============================================
-// SIMULAÇÕES (VERSÃO TURBO)
+// SIMULAÇÕES
 // ============================================
 
 model Simulation {
@@ -179,7 +436,7 @@ model Simulation {
   description String?
   isFavorite  Boolean  @default(false)
   isTemplate  Boolean  @default(false)
-  params      String // JSON SimulationParams
+  params      String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -192,39 +449,28 @@ model Simulation {
 }
 
 model SimulationRun {
-  id           String   @id @default(cuid())
-  simulationId String
-  name         String?
-  executedAt   DateTime @default(now())
+  id                       String   @id @default(cuid())
+  simulationId             String
+  name                     String?
+  executedAt               DateTime @default(now())
+  params                   String
+  quotaIds                 String
+  patrimonioFinal          Float    @default(0)
+  totalPagoParcelas        Float    @default(0)
+  totalPagoBolso           Float    @default(0)
+  totalRecebidoVendas      Float    @default(0)
+  caixaFinalInvestido      Float    @default(0)
+  custoPatrimonio          Float    @default(0)
+  roi                      Float    @default(0)
+  multiplicadorPatrimonial Float    @default(0)
+  custoPorReal             Float    @default(0)
+  numContemplacoes         Int      @default(0)
+  numVendas                Int      @default(0)
+  cotasAtivasFinal         Int      @default(0)
+  comparacaoCdi            String?
+  comparacaoPoupanca       String?
+  resumoTexto              String?
 
-  // Parâmetros usados nesta execução (snapshot)
-  params String // JSON SimulationParams
-
-  // Cotas usadas (IDs)
-  quotaIds String // JSON string[]
-
-  // Resultados agregados
-  patrimonioFinal          Float @default(0)
-  totalPagoParcelas        Float @default(0)
-  totalPagoBolso           Float @default(0)
-  totalRecebidoVendas      Float @default(0)
-  caixaFinalInvestido      Float @default(0)
-  custoPatrimonio          Float @default(0)
-  roi                      Float @default(0)
-  multiplicadorPatrimonial Float @default(0)
-  custoPorReal             Float @default(0)
-  numContemplacoes         Int   @default(0)
-  numVendas                Int   @default(0)
-  cotasAtivasFinal         Int   @default(0)
-
-  // Comparação com índices
-  comparacaoCdi      String? // JSON Comparacao
-  comparacaoPoupanca String? // JSON Comparacao
-
-  // Resumo textual
-  resumoTexto String?
-
-  // Relacionamentos
   simulation Simulation        @relation(fields: [simulationId], references: [id], onDelete: Cascade)
   snapshots  MonthlySnapshot[]
   events     EventLog[]
@@ -235,29 +481,24 @@ model SimulationRun {
 }
 
 model MonthlySnapshot {
-  id              String @id @default(cuid())
-  simulationRunId String
-  mes             Int
-  mesLabel        String
-
-  // Estado do mês
-  parcelasPagas     Int   @default(0)
-  valorParcelas     Float @default(0)
-  contemplacoes     Int   @default(0)
-  vendas            Int   @default(0)
-  valorVendas       Float @default(0)
-  caixa             Float @default(0)
-  caixaInvestido    Float @default(0)
-  patrimonio        Float @default(0)
-  creditoAtualizado Float @default(0)
-  totalPago         Float @default(0)
-  totalPagoBolso    Float @default(0)
-
-  // Comparação acumulada
+  id                String   @id @default(cuid())
+  simulationRunId   String
+  mes               Int
+  mesLabel          String
+  parcelasPagas     Int      @default(0)
+  valorParcelas     Float    @default(0)
+  contemplacoes     Int      @default(0)
+  vendas            Int      @default(0)
+  valorVendas       Float    @default(0)
+  caixa             Float    @default(0)
+  caixaInvestido    Float    @default(0)
+  patrimonio        Float    @default(0)
+  creditoAtualizado Float    @default(0)
+  totalPago         Float    @default(0)
+  totalPagoBolso    Float    @default(0)
   cdiAcumulado      Float?
   poupancaAcumulado Float?
-
-  createdAt DateTime @default(now())
+  createdAt         DateTime @default(now())
 
   simulationRun SimulationRun @relation(fields: [simulationRunId], references: [id], onDelete: Cascade)
 
@@ -269,7 +510,7 @@ model MonthlySnapshot {
 model EventLog {
   id              String   @id @default(cuid())
   simulationRunId String
-  tipo            String // PAGAMENTO | CONTEMPLACAO | VENDA | APLICACAO | REINVESTIMENTO
+  tipo            String
   mes             Int
   cotaId          String?
   cotaGrupo       String?
@@ -277,7 +518,7 @@ model EventLog {
   valor           Float    @default(0)
   descricao       String
   destino         String?
-  metadata        String? // JSON
+  metadata        String?
   createdAt       DateTime @default(now())
 
   simulationRun SimulationRun @relation(fields: [simulationRunId], references: [id], onDelete: Cascade)
@@ -289,12 +530,145 @@ model EventLog {
 }
 
 // ============================================
-// ÍNDICES FINANCEIROS (MARKET DATA)
+// VENDAS E COMISSÕES
+// ============================================
+
+model Sale {
+  id                String    @id @default(cuid())
+  clientId          String
+  sellerId          String
+  partnerId         String?
+  quotaId           String?
+  productType       String
+  creditAmount      Float
+  installmentAmount Float
+  term              Int
+  status            String    @default("proposta")
+  saleDate          DateTime?
+  contemplationDate DateTime?
+  commissionRate    Float?
+  notes             String?
+  metadata          String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  client          User              @relation("ClientSales", fields: [clientId], references: [id])
+  seller          User              @relation("SellerSales", fields: [sellerId], references: [id])
+  partner         User?             @relation("PartnerSales", fields: [partnerId], references: [id])
+  quota           Quota?            @relation(fields: [quotaId], references: [id])
+  commissions     CommissionEntry[]
+  payoutEntries   PayoutEntry[]
+  SellerProfile   SellerProfile?    @relation(fields: [sellerProfileId], references: [id])
+  sellerProfileId String?
+
+  @@index([clientId])
+  @@index([sellerId])
+  @@index([partnerId])
+  @@index([status])
+  @@index([saleDate])
+  @@map("sales")
+}
+
+model CommissionRule {
+  id            String    @id @default(cuid())
+  name          String
+  description   String?
+  levelId       String?
+  productType   String?
+  baseRate      Float     @default(0)
+  splitRules    String
+  overrideRules String?
+  bonusRules    String?
+  validFrom     DateTime  @default(now())
+  validUntil    DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  entries CommissionEntry[]
+
+  @@index([isActive])
+  @@index([validFrom, validUntil])
+  @@map("commission_rules")
+}
+
+model CommissionEntry {
+  id         String    @id @default(cuid())
+  saleId     String
+  userId     String
+  ruleId     String?
+  role       String
+  baseAmount Float
+  rate       Float
+  amount     Float
+  override   Float     @default(0)
+  bonus      Float     @default(0)
+  total      Float
+  status     String    @default("pending")
+  paidAt     DateTime?
+  payoutId   String?
+  notes      String?
+  metadata   String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  sale   Sale            @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  user   User            @relation(fields: [userId], references: [id])
+  rule   CommissionRule? @relation(fields: [ruleId], references: [id])
+  payout Payout?         @relation(fields: [payoutId], references: [id])
+
+  @@index([saleId])
+  @@index([userId])
+  @@index([status])
+  @@index([payoutId])
+  @@map("commission_entries")
+}
+
+model Payout {
+  id               String    @id @default(cuid())
+  userId           String
+  period           String
+  totalAmount      Float
+  status           String    @default("pending")
+  paidAt           DateTime?
+  paymentMethod    String?
+  paymentReference String?
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  user          User              @relation("UserPayouts", fields: [userId], references: [id])
+  entries       CommissionEntry[]
+  payoutEntries PayoutEntry[]
+
+  @@index([userId])
+  @@index([period])
+  @@index([status])
+  @@map("payouts")
+}
+
+model PayoutEntry {
+  id        String   @id @default(cuid())
+  payoutId  String
+  saleId    String
+  amount    Float
+  createdAt DateTime @default(now())
+
+  payout Payout @relation(fields: [payoutId], references: [id], onDelete: Cascade)
+  sale   Sale   @relation(fields: [saleId], references: [id])
+
+  @@index([payoutId])
+  @@index([saleId])
+  @@map("payout_entries")
+}
+
+// ============================================
+// ÍNDICES E MARKET DATA
 // ============================================
 
 model IndexSeries {
   id        String   @id @default(cuid())
-  tipo      String // CDI | INCC | POUPANCA | SELIC | IPCA
+  tipo      String
   data      DateTime
   valor     Float
   fonte     String   @default("manual")
@@ -304,25 +678,49 @@ model IndexSeries {
 
   @@unique([tipo, data, periodo])
   @@index([tipo, data])
-  @@index([tipo, updatedAt])
   @@map("index_series")
 }
 
 // ============================================
-// RELATÓRIOS E EXPORTS
+// RELATÓRIOS
 // ============================================
 
 model Report {
   id              String   @id @default(cuid())
   userId          String
-  simulationRunId String
-  tipo            String // RESUMO_EXECUTIVO | FLUXO_COMPLETO | COMPARATIVO_INDICES | ANALISE_DETALHADA
-  formato         String   @default("pdf")
+  simulationRunId String?
+  type            String
+  format          String   @default("pdf")
   arquivoUrl      String?
-  params          String? // JSON
+  params          String?
   createdAt       DateTime @default(now())
 
   @@index([userId])
   @@index([simulationRunId])
   @@map("reports")
+}
+
+// ============================================
+// AUDITORIA E LOGS
+// ============================================
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  entityType String
+  entityId   String?
+  changes    String?
+  ipAddress  String?
+  userAgent  String?
+  metadata   String?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
 }

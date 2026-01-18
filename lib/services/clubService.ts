@@ -207,12 +207,14 @@ export async function getAvailableExperiences(userId: string) {
     const eligible = !exp.clubLevel || 
       status.currentCredit >= exp.clubLevel.minCreditBRL
     
+    // Calcular slots disponíveis baseado nas datas
+    const totalSlots = exp.dates?.reduce((sum, date) => sum + date.availableSlots, 0) || null
+    
     return {
       ...exp,
       eligible,
-      availableSlots: exp.maxGuests 
-        ? Math.max(0, exp.maxGuests - (exp._count.reservations || 0))
-        : null,
+      availableSlots: totalSlots,
+      dates: exp.dates || [],
     }
   })
 }
