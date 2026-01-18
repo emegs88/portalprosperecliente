@@ -1,5 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// Prisma Schema - VERSÃO TURBO
+// Simulador de Acúmulo de Patrimônio via Consórcio
 
 generator client {
   provider = "prisma-client-js"
@@ -10,30 +10,135 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================
+// AUTENTICAÇÃO
+// ============================================
+
 model User {
-  id           String         @id @default(cuid())
-  name         String
-  email        String         @unique
-  passwordHash String
-  role         String         @default("client")
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  passwordHash  String?
+  role          String    @default("USER") // USER | ADMIN
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relacionamentos NextAuth
+  accounts Account[]
+  sessions Session[]
+
+  // Relacionamentos do sistema
   clientProfile ClientProfile?
   importBatches ImportBatch[]
-  quotas       Quota[]
+  quotas        Quota[]
+  simulations   Simulation[]
+
+  @@index([email])
 }
 
-model ClientProfile {
-  id            String   @id @default(cuid())
-  userId        String   @unique
-  nome          String
-  documento     String
-  administradora String?
-  empresa       String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
 }
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ============================================
+// PERFIL DO CLIENTE
+// ============================================
+
+model ClientProfile {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  nome           String
+  documento      String
+  administradora String?
+  empresa        String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// COTAS
+// ============================================
+
+model Quota {
+  id                String      @id @default(cuid())
+  userId            String
+  importBatchId     String
+  administradora    String?
+  empresa           String?
+  grupo             String
+  cota              String
+  versao            String
+  dataVenda         String
+  situacaoCobranca  String
+  contemplacao      String
+  percentPago       Float       @default(0)
+  percentAtraso     Float       @default(0)
+  percentFundoComum Float       @default(0)
+  pclsPagar         Int         @default(0)
+  pclsPagas         Int         @default(0)
+  pclsPagasEmDia    Int         @default(0)
+  pclsPagasAtraso   Int         @default(0)
+  pclsEmAtraso      Int         @default(0)
+  vlBem             Float       @default(0)
+  vlParcela         Float       @default(0)
+  vlQuitacao        Float       @default(0)
+  vlReceber         Float       @default(0)
+  tipoBem           String?
+  needsReview       Boolean     @default(false)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  importBatch       ImportBatch @relation(fields: [importBatchId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([importBatchId])
+  @@index([grupo, cota])
+  @@map("quotas")
+}
+
+// ============================================
+// IMPORTAÇÕES
+// ============================================
 
 model ImportBatch {
   id         String        @id @default(cuid())
@@ -47,50 +152,177 @@ model ImportBatch {
   user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   quotas     Quota[]
   totals     ImportTotals?
-}
-
-model Quota {
-  id                String       @id @default(cuid())
-  userId            String
-  importBatchId     String
-  administradora    String?
-  empresa           String?
-  grupo             String
-  cota              String
-  versao            String
-  dataVenda         String
-  situacaoCobranca  String
-  contemplacao      String
-  percentPago       Float
-  percentAtraso     Float
-  percentFundoComum Float
-  pclsPagar         Int
-  pclsPagas         Int
-  pclsPagasEmDia    Int
-  pclsPagasAtraso   Int
-  pclsEmAtraso      Int
-  vlBem             Float
-  vlParcela         Float
-  vlQuitacao        Float
-  vlReceber         Float
-  tipoBem           String?
-  needsReview       Boolean      @default(false)
-  createdAt         DateTime     @default(now())
-  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  importBatch       ImportBatch  @relation(fields: [importBatchId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([importBatchId])
-  @@index([grupo, cota])
+  @@map("import_batches")
 }
 
 model ImportTotals {
-  id            String      @id @default(cuid())
-  importBatchId String      @unique
-  totalCotas    Int
-  totalVlBem    Float
-  totalVlParcela Float
+  id              String      @id @default(cuid())
+  importBatchId   String      @unique
+  totalCotas      Int
+  totalVlBem      Float
+  totalVlParcela  Float
   totalVlQuitacao Float
-  totalVlReceber Float
-  importBatch   ImportBatch @relation(fields: [importBatchId], references: [id], onDelete: Cascade)
+  totalVlReceber  Float
+  importBatch     ImportBatch @relation(fields: [importBatchId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// SIMULAÇÕES (VERSÃO TURBO)
+// ============================================
+
+model Simulation {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String   @default("Simulação Sem Nome")
+  description String?
+  isFavorite  Boolean  @default(false)
+  isTemplate  Boolean  @default(false)
+  params      String // JSON SimulationParams
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  runs SimulationRun[]
+
+  @@index([userId])
+  @@index([userId, isFavorite])
+  @@map("simulations")
+}
+
+model SimulationRun {
+  id           String   @id @default(cuid())
+  simulationId String
+  name         String?
+  executedAt   DateTime @default(now())
+
+  // Parâmetros usados nesta execução (snapshot)
+  params String // JSON SimulationParams
+
+  // Cotas usadas (IDs)
+  quotaIds String // JSON string[]
+
+  // Resultados agregados
+  patrimonioFinal          Float @default(0)
+  totalPagoParcelas        Float @default(0)
+  totalPagoBolso           Float @default(0)
+  totalRecebidoVendas      Float @default(0)
+  caixaFinalInvestido      Float @default(0)
+  custoPatrimonio          Float @default(0)
+  roi                      Float @default(0)
+  multiplicadorPatrimonial Float @default(0)
+  custoPorReal             Float @default(0)
+  numContemplacoes         Int   @default(0)
+  numVendas                Int   @default(0)
+  cotasAtivasFinal         Int   @default(0)
+
+  // Comparação com índices
+  comparacaoCdi      String? // JSON Comparacao
+  comparacaoPoupanca String? // JSON Comparacao
+
+  // Resumo textual
+  resumoTexto String?
+
+  // Relacionamentos
+  simulation Simulation        @relation(fields: [simulationId], references: [id], onDelete: Cascade)
+  snapshots  MonthlySnapshot[]
+  events     EventLog[]
+
+  @@index([simulationId])
+  @@index([executedAt])
+  @@map("simulation_runs")
+}
+
+model MonthlySnapshot {
+  id              String @id @default(cuid())
+  simulationRunId String
+  mes             Int
+  mesLabel        String
+
+  // Estado do mês
+  parcelasPagas     Int   @default(0)
+  valorParcelas     Float @default(0)
+  contemplacoes     Int   @default(0)
+  vendas            Int   @default(0)
+  valorVendas       Float @default(0)
+  caixa             Float @default(0)
+  caixaInvestido    Float @default(0)
+  patrimonio        Float @default(0)
+  creditoAtualizado Float @default(0)
+  totalPago         Float @default(0)
+  totalPagoBolso    Float @default(0)
+
+  // Comparação acumulada
+  cdiAcumulado      Float?
+  poupancaAcumulado Float?
+
+  createdAt DateTime @default(now())
+
+  simulationRun SimulationRun @relation(fields: [simulationRunId], references: [id], onDelete: Cascade)
+
+  @@unique([simulationRunId, mes])
+  @@index([simulationRunId])
+  @@map("monthly_snapshots")
+}
+
+model EventLog {
+  id              String   @id @default(cuid())
+  simulationRunId String
+  tipo            String // PAGAMENTO | CONTEMPLACAO | VENDA | APLICACAO | REINVESTIMENTO
+  mes             Int
+  cotaId          String?
+  cotaGrupo       String?
+  cotaNumero      String?
+  valor           Float    @default(0)
+  descricao       String
+  destino         String?
+  metadata        String? // JSON
+  createdAt       DateTime @default(now())
+
+  simulationRun SimulationRun @relation(fields: [simulationRunId], references: [id], onDelete: Cascade)
+
+  @@index([simulationRunId])
+  @@index([simulationRunId, mes])
+  @@index([simulationRunId, tipo])
+  @@map("event_logs")
+}
+
+// ============================================
+// ÍNDICES FINANCEIROS (MARKET DATA)
+// ============================================
+
+model IndexSeries {
+  id        String   @id @default(cuid())
+  tipo      String // CDI | INCC | POUPANCA | SELIC | IPCA
+  data      DateTime
+  valor     Float
+  fonte     String   @default("manual")
+  periodo   String   @default("monthly")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tipo, data, periodo])
+  @@index([tipo, data])
+  @@index([tipo, updatedAt])
+  @@map("index_series")
+}
+
+// ============================================
+// RELATÓRIOS E EXPORTS
+// ============================================
+
+model Report {
+  id              String   @id @default(cuid())
+  userId          String
+  simulationRunId String
+  tipo            String // RESUMO_EXECUTIVO | FLUXO_COMPLETO | COMPARATIVO_INDICES | ANALISE_DETALHADA
+  formato         String   @default("pdf")
+  arquivoUrl      String?
+  params          String? // JSON
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([simulationRunId])
+  @@map("reports")
 }
