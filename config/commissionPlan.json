@@ -1,0 +1,171 @@
+{
+  "defaults": {
+    "currency": "BRL",
+    "baseCommissionType": "percentOfCredit",
+    "baseCommissionValue": 5,
+    "payoutRule": "monthly",
+    "allowPartner": true
+  },
+  "levels": [
+    {
+      "id": "consultor",
+      "name": "Consultor",
+      "description": "Entrada, foco em aprendizagem e primeiras vendas",
+      "requirements": {
+        "monthlySalesCount": 1,
+        "monthlyCreditBRL": 100000
+      },
+      "split": {
+        "seller": 70,
+        "leader": 20,
+        "partner": 10
+      },
+      "bonus": {
+        "type": "fixed",
+        "valueBRL": 0
+      }
+    },
+    {
+      "id": "especialista",
+      "name": "Especialista",
+      "description": "Consistência e ticket médio maior",
+      "requirements": {
+        "monthlySalesCount": 3,
+        "monthlyCreditBRL": 300000
+      },
+      "split": {
+        "seller": 75,
+        "leader": 15,
+        "partner": 10
+      },
+      "bonus": {
+        "type": "fixed",
+        "valueBRL": 500
+      }
+    },
+    {
+      "id": "senior",
+      "name": "Sênior",
+      "description": "Alta performance e previsibilidade",
+      "requirements": {
+        "monthlySalesCount": 6,
+        "monthlyCreditBRL": 700000
+      },
+      "split": {
+        "seller": 80,
+        "leader": 10,
+        "partner": 10
+      },
+      "bonus": {
+        "type": "percentOfCommission",
+        "value": 5
+      }
+    },
+    {
+      "id": "lider",
+      "name": "Líder",
+      "description": "Forma time e ganha override",
+      "requirements": {
+        "teamActive": 3,
+        "teamMonthlyCreditBRL": 1200000
+      },
+      "split": {
+        "seller": 80,
+        "leader": 15,
+        "partner": 5
+      },
+      "override": {
+        "type": "percentOfCredit",
+        "value": 0.3
+      },
+      "bonus": {
+        "type": "fixed",
+        "valueBRL": 1500
+      }
+    },
+    {
+      "id": "gerente",
+      "name": "Gerente",
+      "description": "Multiplica líderes e recebe participação maior",
+      "requirements": {
+        "teamActive": 5,
+        "teamMonthlyCreditBRL": 3000000
+      },
+      "split": {
+        "seller": 85,
+        "leader": 10,
+        "partner": 5
+      },
+      "override": {
+        "type": "percentOfCredit",
+        "value": 0.5
+      },
+      "bonus": {
+        "type": "fixed",
+        "valueBRL": 3000
+      }
+    },
+    {
+      "id": "diretor",
+      "name": "Diretor",
+      "description": "Operação regional, metas e participação estratégica",
+      "requirements": {
+        "teamActive": 10,
+        "teamMonthlyCreditBRL": 5000000
+      },
+      "split": {
+        "seller": 90,
+        "leader": 8,
+        "partner": 2
+      },
+      "override": {
+        "type": "percentOfCredit",
+        "value": 1.0
+      },
+      "bonus": {
+        "type": "fixed",
+        "valueBRL": 5000
+      }
+    }
+  ],
+  "products": [
+    {
+      "id": "auto",
+      "name": "Auto/Moto",
+      "commissionMultiplier": 1.0
+    },
+    {
+      "id": "imovel",
+      "name": "Imóvel",
+      "commissionMultiplier": 1.2
+    },
+    {
+      "id": "servicos",
+      "name": "Serviços",
+      "commissionMultiplier": 0.8
+    }
+  ],
+  "metaBonuses": [
+    {
+      "id": "meta1",
+      "thresholdMonthlyCreditBRL": 1000000,
+      "bonusBRL": 1000
+    },
+    {
+      "id": "meta2",
+      "thresholdMonthlyCreditBRL": 3000000,
+      "bonusBRL": 4000
+    },
+    {
+      "id": "meta3",
+      "thresholdMonthlyCreditBRL": 5000000,
+      "bonusBRL": 8000
+    }
+  ],
+  "notes": [
+    "Os percentuais são editáveis.",
+    "Partner é opcional; se não existir, redistribuir proporcionalmente entre seller e leader.",
+    "Override é calculado sobre o crédito total da equipe.",
+    "Bônus de meta é cumulativo."
+  ]
+}

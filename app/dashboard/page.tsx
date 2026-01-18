@@ -10,6 +10,7 @@ import { ImportacoesTab } from '@/components/dashboard/ImportacoesTab'
 import { PatrimonioTab } from '@/components/dashboard/PatrimonioTab'
 import { ProspereVidaTab } from '@/components/dashboard/ProspereVidaTab'
 import { SimulacoesTab } from '@/components/dashboard/SimulacoesTab'
+import { PlanoCarreiraTab } from '@/components/dashboard/PlanoCarreiraTab'
 import { BrandHeader } from '@/components/BrandHeader'
 import { LogoutButton } from '@/components/LogoutButton'
 
@@ -51,13 +52,14 @@ export default function DashboardPage() {
           <LogoutButton />
         </div>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-6 bg-gray-800">
+          <TabsList className="grid w-full grid-cols-7 bg-gray-800">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="cotas">Cotas</TabsTrigger>
             <TabsTrigger value="importacoes">Importações</TabsTrigger>
             <TabsTrigger value="patrimonio">Patrimônio</TabsTrigger>
             <TabsTrigger value="prospere-vida">Prospere Vida</TabsTrigger>
             <TabsTrigger value="simulacoes">Simulações</TabsTrigger>
+            <TabsTrigger value="plano-carreira">Plano de Carreira</TabsTrigger>
           </TabsList>
           <TabsContent value="dashboard" className="mt-6">
             <DashboardTab />
@@ -76,6 +78,9 @@ export default function DashboardPage() {
           </TabsContent>
           <TabsContent value="simulacoes" className="mt-6">
             <SimulacoesTab />
+          </TabsContent>
+          <TabsContent value="plano-carreira" className="mt-6">
+            <PlanoCarreiraTab />
           </TabsContent>
         </Tabs>
       </div>

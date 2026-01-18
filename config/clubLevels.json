@@ -1,0 +1,89 @@
+{
+  "levels": [
+    {
+      "id": "bronze",
+      "name": "BRONZE",
+      "displayName": "Bronze",
+      "minCreditBRL": 0,
+      "maxCreditBRL": 100000,
+      "color": "#CD7F32",
+      "description": "Seu início no Clube Prospere",
+      "benefits": [
+        "Acesso a experiências exclusivas",
+        "Descontos em parceiros",
+        "Consultoria especializada",
+        "Newsletter com dicas de patrimônio"
+      ]
+    },
+    {
+      "id": "prata",
+      "name": "PRATA",
+      "displayName": "Prata",
+      "minCreditBRL": 100000,
+      "maxCreditBRL": 500000,
+      "color": "#C0C0C0",
+      "description": "Evoluindo seu patrimônio",
+      "benefits": [
+        "Todos os benefícios Bronze",
+        "Prioridade em experiências",
+        "Descontos maiores em parceiros",
+        "Acesso a eventos VIP",
+        "Suporte dedicado"
+      ]
+    },
+    {
+      "id": "ouro",
+      "name": "OURO",
+      "displayName": "Ouro",
+      "minCreditBRL": 500000,
+      "maxCreditBRL": 1000000,
+      "color": "#FFD700",
+      "description": "Patrimônio em crescimento",
+      "benefits": [
+        "Todos os benefícios Prata",
+        "Experiências premium",
+        "Upgrades automáticos",
+        "Mentoria personalizada",
+        "Rede exclusiva de contatos"
+      ]
+    },
+    {
+      "id": "platina",
+      "name": "PLATINA",
+      "displayName": "Platina",
+      "minCreditBRL": 1000000,
+      "maxCreditBRL": 2000000,
+      "color": "#E5E4E2",
+      "description": "Patrimônio consolidado",
+      "benefits": [
+        "Todos os benefícios Ouro",
+        "Experiências exclusivas e limitadas",
+        "Concierge personalizado",
+        "Acesso a oportunidades de investimento",
+        "Participação em decisões estratégicas"
+      ]
+    },
+    {
+      "id": "diamante",
+      "name": "DIAMANTE",
+      "displayName": "Diamante",
+      "minCreditBRL": 2000000,
+      "maxCreditBRL": null,
+      "color": "#B9F2FF",
+      "description": "Máximo nível do clube",
+      "benefits": [
+        "Todos os benefícios Platina",
+        "Experiências únicas e personalizadas",
+        "Parceiros premium exclusivos",
+        "Gestor de relacionamento dedicado",
+        "Participação em eventos de elite",
+        "Acesso a oportunidades premium"
+      ]
+    }
+  ],
+  "eligibilityRules": {
+    "calculationMethod": "totalCredit", // totalCredit, paidCredit, activeCredit
+    "updateFrequency": "monthly", // daily, weekly, monthly
+    "gracePeriod": 30 // dias de graça antes de perder nível
+  }
+}
