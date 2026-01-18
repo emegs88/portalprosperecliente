@@ -3,18 +3,19 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { parsePDF } from '@/lib/services/pdfParser'
-import { parsePDF as parsePDFWithOCR } from '@/lib/services/pdfParserWithOCR'
-import { writeFile } from 'fs/promises'
-import path from 'path'
+import { writeFile, mkdir } from 'fs/promises'
+import { join } from 'path'
+import { existsSync } from 'fs'
+
+export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 export async function POST(request: NextRequest) {
-  let importBatch: any = null
-  
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const formData = await request.formData()
@@ -24,164 +25,118 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Nenhum arquivo enviado' }, { status: 400 })
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer())
-    
-    // Salvar arquivo
-    const filename = `${Date.now()}-${file.name}`
-    const uploadPath = path.join(process.cwd(), 'uploads', filename)
-    await writeFile(uploadPath, buffer)
+    if (file.type !== 'application/pdf') {
+      return NextResponse.json({ error: 'Arquivo deve ser PDF' }, { status: 400 })
+    }
 
-    // Criar import batch
-    importBatch = await prisma.importBatch.create({
+    // Salvar arquivo temporariamente
+    const uploadsDir = join(process.cwd(), 'uploads')
+    if (!existsSync(uploadsDir)) {
+      await mkdir(uploadsDir, { recursive: true })
+    }
+
+    const timestamp = Date.now()
+    const filename = `${timestamp}-${file.name}`
+    const filepath = join(uploadsDir, filename)
+
+    const bytes = await file.arrayBuffer()
+    const buffer = Buffer.from(bytes)
+
+    await writeFile(filepath, buffer)
+
+    // Parse PDF
+    const parseResult = await parsePDF(buffer)
+
+    if (parseResult.errors.length > 0 && parseResult.quotas.length === 0) {
+      return NextResponse.json(
+        { error: parseResult.errors.join(', ') },
+        { status: 400 }
+      )
+    }
+
+    // Criar batch de importação
+    const importBatch = await prisma.importBatch.create({
       data: {
         userId: session.user.id,
+        sourceType: 'PDF',
         filename: file.name,
-        status: 'processing',
+        status: 'PENDING',
+        errorsJson: parseResult.errors.length > 0 ? JSON.stringify(parseResult.errors) : null,
       },
     })
 
-    // Parse PDF - primeiro tenta normal, depois OCR se necessário
-    console.log('📄 Iniciando parse do PDF:', file.name)
-    let parsed = await parsePDF(buffer)
-    console.log(`📊 Parse normal: ${parsed.quotas.length} cotas encontradas`)
-    
-    // Se não encontrou cotas suficientes, tenta com OCR
-    if (parsed.quotas.length === 0) {
-      console.log('⚠️  Nenhuma cota encontrada no modo normal, tentando OCR...')
-      try {
-        parsed = await parsePDFWithOCR(buffer, true)
-        console.log(`📊 Parse OCR: ${parsed.quotas.length} cotas encontradas`)
-      } catch (ocrError: any) {
-        console.error('❌ Erro no OCR:', ocrError)
-        // Continuar com o parsed vazio
-      }
-    }
-
-    // Salvar quotas
-    if (parsed.quotas && parsed.quotas.length > 0) {
-      console.log(`💾 Salvando ${parsed.quotas.length} cotas no banco...`)
-      const quotasData = parsed.quotas.map(q => ({
-        userId: session.user.id,
-        importBatchId: importBatch.id,
-        administradora: (parsed.header?.administradora) || null,
-        empresa: (parsed.header?.empresa) || null,
-        grupo: q.grupo || '',
-        cota: q.cota || '',
-        versao: q.versao || '',
-        dataVenda: q.dataVenda || '',
-        situacaoCobranca: q.situacaoCobranca || 'N00 - NORMAL',
-        contemplacao: q.contemplacao || 'Não Contemplada',
-        percentPago: q.percentPago || 0,
-        percentAtraso: q.percentAtraso || 0,
-        percentFundoComum: q.percentFundoComum || 0,
-        pclsPagar: q.pclsPagar || 0,
-        pclsPagas: q.pclsPagas || 0,
-        pclsPagasEmDia: q.pclsPagasEmDia || 0,
-        pclsPagasAtraso: q.pclsPagasAtraso || 0,
-        pclsEmAtraso: q.pclsEmAtraso || 0,
-        vlBem: q.vlBem || 0,
-        vlParcela: q.vlParcela || 0,
-        vlQuitacao: q.vlQuitacao || 0,
-        vlReceber: q.vlReceber || 0,
-        tipoBem: q.tipoBem || null,
-      }))
-
-      // Deletar cotas anteriores deste batch antes de inserir novas
-      await prisma.quota.deleteMany({
-        where: { importBatchId: importBatch.id }
-      })
-
-      // Remover duplicatas antes de inserir (baseado em grupo + cota)
-      const uniqueQuotas = quotasData.filter((q, index, self) =>
-        index === self.findIndex((q2) => q2.grupo === q.grupo && q2.cota === q.cota)
-      )
-      
-      if (uniqueQuotas.length !== quotasData.length) {
-        console.log(`⚠️  ${quotasData.length - uniqueQuotas.length} cotas duplicadas removidas antes de salvar`)
-      }
-
+    // Criar quotas
+    if (parseResult.quotas.length > 0) {
       await prisma.quota.createMany({
-        data: uniqueQuotas,
+        data: parseResult.quotas.map(quota => ({
+          userId: session.user.id,
+          importBatchId: importBatch.id,
+          grupo: quota.grupo,
+          cota: quota.cota,
+          versao: quota.versao,
+          dataVenda: quota.dataVenda || new Date().toLocaleDateString('pt-BR'),
+          situacaoCobranca: quota.situacaoCobranca,
+          contemplacao: quota.contemplacao,
+          percentPago: quota.percentPago,
+          percentAtraso: quota.percentAtraso,
+          percentFundoComum: quota.percentFundoComum,
+          pclsPagar: quota.pclsPagar,
+          pclsPagas: quota.pclsPagas,
+          pclsPagasEmDia: quota.pclsPagasEmDia,
+          pclsPagasAtraso: quota.pclsPagasAtraso,
+          pclsEmAtraso: quota.pclsEmAtraso,
+          vlBem: quota.vlBem,
+          vlParcela: quota.vlParcela,
+          vlQuitacao: quota.vlQuitacao,
+          vlReceber: quota.vlReceber,
+        })),
       })
-      
-      console.log(`✅ ${uniqueQuotas.length} cotas salvas no banco`)
-    } else {
-      console.error('❌ Nenhuma cota para salvar!')
-      console.error('📋 Dados do parse:', {
-        quotas: parsed.quotas?.length || 0,
-        errors: parsed.errors || [],
-        header: parsed.header || {},
-      })
-    }
 
-    // Salvar totais
-    if (parsed.totals) {
+      // Calcular totais
+      const totals = parseResult.quotas.reduce(
+        (acc, q) => ({
+          totalCotas: acc.totalCotas + 1,
+          totalVlBem: acc.totalVlBem + q.vlBem,
+          totalVlParcela: acc.totalVlParcela + q.vlParcela,
+          totalVlQuitacao: acc.totalVlQuitacao + q.vlQuitacao,
+          totalVlReceber: acc.totalVlReceber + q.vlReceber,
+        }),
+        {
+          totalCotas: 0,
+          totalVlBem: 0,
+          totalVlParcela: 0,
+          totalVlQuitacao: 0,
+          totalVlReceber: 0,
+        }
+      )
+
       await prisma.importTotals.create({
         data: {
           importBatchId: importBatch.id,
-          totalCotas: parsed.totals.totalCotas,
-          totalVlBem: parsed.totals.totalVlBem,
-          totalVlParcela: parsed.totals.totalVlParcela,
-          totalVlQuitacao: parsed.totals.totalVlQuitacao,
-          totalVlReceber: parsed.totals.totalVlReceber,
+          ...totals,
+        },
+      })
+
+      // Atualizar status do batch
+      await prisma.importBatch.update({
+        where: { id: importBatch.id },
+        data: {
+          status: 'COMPLETED',
+          parsedAt: new Date(),
         },
       })
     }
 
-    // Atualizar status
-    const hasErrors = parsed.errors && parsed.errors.length > 0
-    const hasQuotas = parsed.quotas && parsed.quotas.length > 0
-    const finalStatus = hasQuotas ? (hasErrors ? 'pending_review' : 'completed') : 'failed'
-    
-    await prisma.importBatch.update({
-      where: { id: importBatch.id },
-      data: {
-        status: finalStatus,
-        parsedAt: new Date(),
-        errorsJson: hasErrors ? JSON.stringify(parsed.errors) : null,
-      },
-    })
-
-    console.log(`✅ Importação finalizada: ${finalStatus}, ${parsed.quotas?.length || 0} cotas`)
-
     return NextResponse.json({
-      success: hasQuotas,
+      success: true,
       importBatchId: importBatch.id,
-      quotasImportadas: parsed.quotas?.length || 0,
-      quotas: parsed.quotas || [],
-      totals: parsed.totals || null,
-      errors: parsed.errors || [],
-      header: parsed.header || {},
-      message: hasQuotas 
-        ? `Importação concluída! ${parsed.quotas.length} cotas importadas.`
-        : 'Nenhuma cota foi encontrada no PDF. Verifique se o arquivo está no formato correto.',
+      quotasCount: parseResult.quotas.length,
+      errors: parseResult.errors,
     })
-  } catch (error: any) {
-    console.error('❌ Erro ao importar PDF:', error)
-    console.error('❌ Stack:', error.stack)
-    
-    // Se tiver importBatch, atualizar status para failed
-    if (importBatch?.id) {
-      try {
-        await prisma.importBatch.update({
-          where: { id: importBatch.id },
-          data: {
-            status: 'failed',
-            errorsJson: JSON.stringify([error.message || 'Erro desconhecido']),
-          },
-        })
-      } catch (updateError) {
-        console.error('Erro ao atualizar status do batch:', updateError)
-      }
-    }
-    
+  } catch (error) {
+    console.error('Import PDF error:', error)
     return NextResponse.json(
-      { 
-        success: false,
-        error: error.message || 'Erro ao processar PDF',
-        quotasImportadas: 0,
-        quotas: [],
-      },
+      { error: error instanceof Error ? error.message : 'Erro ao importar PDF' },
       { status: 500 }
     )
   }

@@ -1,293 +1,297 @@
 'use client'
 
-import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Upload, FileText, FileSpreadsheet, AlertCircle, CheckCircle2 } from 'lucide-react'
-import { ExcelMapping } from '@/lib/services/excelParser'
-import ImportPreviewTable from '../import/ImportPreviewTable'
+import ImportPreviewTable from '@/components/import/ImportPreviewTable'
+import { Upload, FileText, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
+import { formatCurrency } from '@/lib/utils'
 
-export default function ImportacoesTab() {
-  const [file, setFile] = useState<File | null>(null)
-  const [fileType, setFileType] = useState<'PDF' | 'XLSX'>('PDF')
-  const [uploading, setUploading] = useState(false)
-  const [result, setResult] = useState<any>(null)
-  const [excelHeaders, setExcelHeaders] = useState<string[]>([])
-  const [excelRows, setExcelRows] = useState<any[][]>([])
-  const [mapping, setMapping] = useState<ExcelMapping>({})
-  const [showMapping, setShowMapping] = useState(false)
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const selectedFile = e.target.files[0]
-      setFile(selectedFile)
-      
-      // Detectar tipo
-      if (selectedFile.name.endsWith('.xlsx') || selectedFile.name.endsWith('.xls')) {
-        setFileType('XLSX')
-        previewExcel(selectedFile)
-      } else {
-        setFileType('PDF')
-      }
-    }
+interface ImportBatch {
+  id: string
+  sourceType: string
+  filename: string
+  status: string
+  createdAt: string
+  parsedAt?: string
+  quotasCount?: number
+  totals?: {
+    totalCotas: number
+    totalVlBem: number
+    totalVlParcela: number
   }
+}
 
-  const previewExcel = async (file: File) => {
-    try {
-      const XLSX = await import('xlsx')
-      const buffer = await file.arrayBuffer()
-      const workbook = XLSX.read(buffer, { type: 'array' })
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
-      const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' }) as any[][]
-      
-      if (jsonData.length > 0) {
-        setExcelHeaders(jsonData[0].map((h: any) => String(h || '').trim()))
-        setExcelRows(jsonData.slice(1))
-        setShowMapping(true)
-      }
-    } catch (error) {
-      console.error('Erro ao preview Excel:', error)
-    }
+export function ImportacoesTab() {
+  const [activeTab, setActiveTab] = useState<'upload' | 'history'>('upload')
+  const [file, setFile] = useState<File | null>(null)
+  const [preview, setPreview] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [importHistory, setImportHistory] = useState<ImportBatch[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
+  const [useOCR, setUseOCR] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0]
+    if (!selectedFile) return
+
+    setFile(selectedFile)
+    setError('')
+    setSuccess('')
+    setPreview(null)
+
+    // Preview do arquivo selecionado
+    setPreview({
+      name: selectedFile.name,
+      size: selectedFile.size,
+      type: selectedFile.type,
+    })
   }
 
   const handleUpload = async () => {
-    if (!file) return
-
-    setUploading(true)
-    const formData = new FormData()
-    formData.append('file', file)
-
-    if (fileType === 'XLSX' && showMapping) {
-      formData.append('mapping', JSON.stringify({
-        headers: excelHeaders,
-        rows: excelRows,
-        mapping,
-      }))
+    if (!file) {
+      setError('Selecione um arquivo')
+      return
     }
 
+    setLoading(true)
+    setError('')
+    setSuccess('')
+
     try {
-      const endpoint = fileType === 'PDF' ? '/api/import/pdf' : '/api/import/excel'
-      const res = await fetch(endpoint, {
+      const isExcel = 
+        file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+        file.type === 'application/vnd.ms-excel' ||
+        file.name.endsWith('.xlsx') ||
+        file.name.endsWith('.xls')
+
+      const formData = new FormData()
+      formData.append('file', file)
+      if (useOCR && !isExcel) {
+        formData.append('useOCR', 'true')
+      }
+
+      const endpoint = isExcel ? '/api/import/excel' : useOCR ? '/api/import/pdf-ocr' : '/api/import/pdf'
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         body: formData,
       })
 
-      const data = await res.json()
-      setResult(data)
-      
-      if (data.success) {
-        alert(data.message || `Importação concluída! ${data.quotasImportadas || 0} cotas importadas.`)
-        window.location.reload()
-      } else {
-        const errorMsg = data.message || data.error || 'Erro ao importar arquivo'
-        alert(`Erro: ${errorMsg}`)
-        console.error('Erro na importação:', data)
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao importar arquivo')
       }
-    } catch (error) {
-      console.error('Erro ao importar:', error)
-      alert('Erro ao importar arquivo')
+
+      setSuccess(`✅ ${data.quotasCount} cotas importadas com sucesso!`)
+      setFile(null)
+      setPreview(null)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+
+      // Recarregar histórico
+      if (activeTab === 'history') {
+        loadImportHistory()
+      } else {
+        setActiveTab('history')
+        loadImportHistory()
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao importar arquivo')
     } finally {
-      setUploading(false)
+      setLoading(false)
     }
+  }
+
+  const loadImportHistory = async () => {
+    setLoadingHistory(true)
+    try {
+      const response = await fetch('/api/import/history')
+      if (response.ok) {
+        const data = await response.json()
+        setImportHistory(data.batches || [])
+      }
+    } catch (err) {
+      console.error('Erro ao carregar histórico:', err)
+    } finally {
+      setLoadingHistory(false)
+    }
+  }
+
+  const getFileIcon = (sourceType: string) => {
+    return sourceType === 'PDF' ? (
+      <FileText className="w-5 h-5 text-red-500" />
+    ) : (
+      <FileSpreadsheet className="w-5 h-5 text-green-500" />
+    )
+  }
+
+  const getStatusIcon = (status: string) => {
+    return status === 'COMPLETED' ? (
+      <CheckCircle2 className="w-5 h-5 text-green-500" />
+    ) : (
+      <AlertCircle className="w-5 h-5 text-yellow-500" />
+    )
   }
 
   return (
     <div className="space-y-6">
-      <Tabs value={fileType} onValueChange={(value) => setFileType(value as 'PDF' | 'XLSX')}>
-        <TabsList className="bg-black/50 border border-red-600/20">
-          <TabsTrigger value="PDF" className="data-[state=active]:bg-primary">
-            <FileText className="h-4 w-4 mr-2" />
-            Importar PDF
-          </TabsTrigger>
-          <TabsTrigger value="XLSX" className="data-[state=active]:bg-primary">
-            <FileSpreadsheet className="h-4 w-4 mr-2" />
-            Importar Excel
-          </TabsTrigger>
+      <div>
+        <h2 className="text-2xl font-bold text-white mb-2">Importações</h2>
+        <p className="text-gray-400">
+          Importe extratos em PDF ou planilhas Excel com suas cotas
+        </p>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={(v) => {
+        setActiveTab(v as 'upload' | 'history')
+        if (v === 'history') {
+          loadImportHistory()
+        }
+      }}>
+        <TabsList className="bg-gray-800">
+          <TabsTrigger value="upload">Upload</TabsTrigger>
+          <TabsTrigger value="history">Histórico</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="PDF">
-          <Card className="bg-black/50 border-red-600/20">
+        <TabsContent value="upload" className="space-y-4 mt-6">
+          <Card className="bg-gray-800 border-gray-700">
             <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <Upload className="h-5 w-5" />
-                Importar PDF de Extrato
-              </CardTitle>
+              <CardTitle className="text-white">Importar Arquivo</CardTitle>
+              <CardDescription className="text-gray-400">
+                Selecione um arquivo PDF ou Excel para importar suas cotas
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="pdf-file" className="text-white">
-                  Selecione o arquivo PDF (formato Âncora)
-                </Label>
-                <Input
-                  id="pdf-file"
+              <div className="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center">
+                <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <input
+                  ref={fileInputRef}
                   type="file"
-                  accept=".pdf"
+                  accept=".pdf,.xlsx,.xls"
                   onChange={handleFileChange}
-                  className="bg-black border-red-600/20 text-white"
+                  className="hidden"
+                  id="file-upload"
                 />
+                <label
+                  htmlFor="file-upload"
+                  className="cursor-pointer inline-block"
+                >
+                  <Button variant="outline" asChild>
+                    <span>Selecionar Arquivo</span>
+                  </Button>
+                </label>
+                {preview && (
+                  <div className="mt-4 text-sm text-gray-300">
+                    <p>
+                      {preview.name} ({(preview.size / 1024).toFixed(2)} KB)
+                    </p>
+                  </div>
+                )}
               </div>
 
-              {file && fileType === 'PDF' && (
-                <div className="p-4 bg-black/30 rounded-lg">
-                  <div className="flex items-center gap-2 text-white">
-                    <FileText className="h-4 w-4" />
-                    <span>{file.name}</span>
-                    <span className="text-gray-400 text-sm">
-                      ({(file.size / 1024).toFixed(2)} KB)
-                    </span>
-                  </div>
+              {error && (
+                <div className="bg-red-950/50 border border-red-500 rounded-lg p-4 flex items-center gap-2 text-red-300">
+                  <AlertCircle className="w-5 h-5" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {success && (
+                <div className="bg-green-950/50 border border-green-500 rounded-lg p-4 flex items-center gap-2 text-green-300">
+                  <CheckCircle2 className="w-5 h-5" />
+                  <span>{success}</span>
+                </div>
+              )}
+
+              {/* Opção OCR para PDF */}
+              {file && !file.name.endsWith('.xlsx') && !file.name.endsWith('.xls') && (
+                <div className="flex items-center space-x-2 p-4 bg-gray-700/50 rounded-lg">
+                  <Checkbox
+                    id="useOCR"
+                    checked={useOCR}
+                    onCheckedChange={(checked) => setUseOCR(checked as boolean)}
+                  />
+                  <Label htmlFor="useOCR" className="text-gray-300 cursor-pointer text-sm">
+                    Usar OCR para extrair texto do PDF (mais lento, mas mais preciso para PDFs escaneados)
+                  </Label>
                 </div>
               )}
 
               <Button
                 onClick={handleUpload}
-                disabled={!file || uploading || fileType !== 'PDF'}
+                disabled={!file || loading}
                 className="w-full"
               >
-                {uploading ? 'Importando...' : 'Importar PDF'}
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Importando...
+                  </>
+                ) : (
+                  'Importar Arquivo'
+                )}
               </Button>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="XLSX">
-          <Card className="bg-black/50 border-red-600/20">
+        <TabsContent value="history" className="mt-6">
+          <Card className="bg-gray-800 border-gray-700">
             <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <FileSpreadsheet className="h-5 w-5" />
-                Importar Excel (.xlsx)
-              </CardTitle>
+              <CardTitle className="text-white">Histórico de Importações</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="excel-file" className="text-white">
-                  Selecione o arquivo Excel
-                </Label>
-                <Input
-                  id="excel-file"
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={handleFileChange}
-                  className="bg-black border-red-600/20 text-white"
-                />
-              </div>
-
-              {file && fileType === 'XLSX' && (
-                <>
-                  <div className="p-4 bg-black/30 rounded-lg">
-                    <div className="flex items-center gap-2 text-white">
-                      <FileSpreadsheet className="h-4 w-4" />
-                      <span>{file.name}</span>
-                      <span className="text-gray-400 text-sm">
-                        ({(file.size / 1024).toFixed(2)} KB)
-                      </span>
-                    </div>
-                  </div>
-
-                  {showMapping && excelHeaders.length > 0 && (
-                    <div className="space-y-4 p-4 bg-black/30 rounded-lg">
-                      <h3 className="text-white font-semibold">Mapeamento de Colunas</h3>
-                      <p className="text-sm text-gray-400">
-                        Mapeie as colunas do Excel para os campos do sistema
-                      </p>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label className="text-white text-sm">Grupo</Label>
-                          <Select
-                            value={mapping.grupo || ''}
-                            onValueChange={(value) => setMapping({ ...mapping, grupo: value })}
-                          >
-                            <SelectTrigger className="bg-black border-red-600/20 text-white">
-                              <SelectValue placeholder="Selecione a coluna" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {excelHeaders.map((h, idx) => (
-                                <SelectItem key={idx} value={h}>{h}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-white text-sm">Cota</Label>
-                          <Select
-                            value={mapping.cota || ''}
-                            onValueChange={(value) => setMapping({ ...mapping, cota: value })}
-                          >
-                            <SelectTrigger className="bg-black border-red-600/20 text-white">
-                              <SelectValue placeholder="Selecione a coluna" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {excelHeaders.map((h, idx) => (
-                                <SelectItem key={idx} value={h}>{h}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-white text-sm">Valor do Bem</Label>
-                          <Select
-                            value={mapping.vlBem || ''}
-                            onValueChange={(value) => setMapping({ ...mapping, vlBem: value })}
-                          >
-                            <SelectTrigger className="bg-black border-red-600/20 text-white">
-                              <SelectValue placeholder="Selecione a coluna" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {excelHeaders.map((h, idx) => (
-                                <SelectItem key={idx} value={h}>{h}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-white text-sm">Parcela</Label>
-                          <Select
-                            value={mapping.vlParcela || ''}
-                            onValueChange={(value) => setMapping({ ...mapping, vlParcela: value })}
-                          >
-                            <SelectTrigger className="bg-black border-red-600/20 text-white">
-                              <SelectValue placeholder="Selecione a coluna" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {excelHeaders.map((h, idx) => (
-                                <SelectItem key={idx} value={h}>{h}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+            <CardContent>
+              {loadingHistory ? (
+                <div className="flex justify-center items-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                </div>
+              ) : importHistory.length === 0 ? (
+                <p className="text-gray-400 text-center py-8">
+                  Nenhuma importação realizada ainda
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {importHistory.map((batch) => (
+                    <div
+                      key={batch.id}
+                      className="border border-gray-700 rounded-lg p-4 flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-4">
+                        {getFileIcon(batch.sourceType)}
+                        <div>
+                          <p className="text-white font-medium">{batch.filename}</p>
+                          <p className="text-sm text-gray-400">
+                            {new Date(batch.createdAt).toLocaleString('pt-BR')}
+                          </p>
+                          {batch.totals && (
+                            <p className="text-sm text-gray-400 mt-1">
+                              {batch.totals.totalCotas} cotas •{' '}
+                              {formatCurrency(batch.totals.totalVlBem)} total
+                            </p>
+                          )}
                         </div>
                       </div>
+                      <div className="flex items-center gap-2">
+                        {getStatusIcon(batch.status)}
+                        <span className="text-sm text-gray-400">{batch.status}</span>
+                      </div>
                     </div>
-                  )}
-                </>
+                  ))}
+                </div>
               )}
-
-              <Button
-                onClick={handleUpload}
-                disabled={!file || uploading || !mapping.grupo || !mapping.cota}
-                className="w-full"
-              >
-                {uploading ? 'Importando...' : 'Importar Excel'}
-              </Button>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
-
-      {result && result.quotas && (
-        <ImportPreviewTable
-          quotas={result.quotas}
-          onConfirm={() => window.location.reload()}
-          loading={uploading}
-        />
-      )}
     </div>
   )
 }

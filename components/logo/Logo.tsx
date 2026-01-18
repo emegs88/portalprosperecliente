@@ -1,4 +1,3 @@
-import React from 'react'
 import Image from 'next/image'
 
 interface LogoProps {
@@ -8,18 +7,18 @@ interface LogoProps {
 
 export function Logo({ className = '', size = 'md' }: LogoProps) {
   const sizes = {
-    sm: { width: 146, height: 100 },
-    md: { width: 195, height: 134 },
-    lg: { width: 292, height: 201 },
+    sm: { width: 120, height: 40, text: 'text-sm' },
+    md: { width: 180, height: 60, text: 'text-base' },
+    lg: { width: 240, height: 80, text: 'text-xl' },
   }
 
   const currentSize = sizes[size]
 
   return (
-    <div className={`flex items-center ${className}`}>
+    <div className={`flex items-center gap-3 ${className}`}>
       <Image
         src="/logo/logo-prospere.png"
-        alt="Consórcios Prospere"
+        alt="Prospere Consórcios"
         width={currentSize.width}
         height={currentSize.height}
         className="object-contain"

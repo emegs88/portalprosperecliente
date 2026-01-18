@@ -37,7 +37,7 @@ interface ProspereVidaData {
   totalCotas: number
 }
 
-export default function ProspereVidaTab() {
+export function ProspereVidaTab() {
   const [data, setData] = useState<ProspereVidaData | null>(null)
   const [loading, setLoading] = useState(true)
 

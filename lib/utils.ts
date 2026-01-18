@@ -8,7 +8,7 @@ export function cn(...inputs: ClassValue[]) {
 export function formatCurrency(value: number): string {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
-    currency: 'BRL'
+    currency: 'BRL',
   }).format(value)
 }
 
@@ -16,35 +16,30 @@ export function formatPercent(value: number): string {
   return new Intl.NumberFormat('pt-BR', {
     style: 'percent',
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2
+    maximumFractionDigits: 2,
   }).format(value / 100)
 }
 
 export function formatCurrencyCompact(value: number): string {
-  if (value === 0) return 'R$ 0,00'
-  
-  const absValue = Math.abs(value)
-  
-  if (absValue >= 1_000_000_000) {
-    return `R$ ${(value / 1_000_000_000).toFixed(1).replace('.', ',')} bi`
-  } else if (absValue >= 1_000_000) {
-    return `R$ ${(value / 1_000_000).toFixed(1).replace('.', ',')} mi`
-  } else if (absValue >= 1_000) {
-    return `R$ ${(value / 1_000).toFixed(1).replace('.', ',')} mil`
-  } else {
-    return formatCurrency(value)
+  if (value >= 1_000_000) {
+    return `R$ ${(value / 1_000_000).toFixed(1)} mi`
   }
+  if (value >= 1_000) {
+    return `R$ ${(value / 1_000).toFixed(0)}k`
+  }
+  return formatCurrency(value)
 }
 
 export function parseBrazilianNumber(value: string): number {
   return parseFloat(
     value
+      .replace(/[^\d,.-]/g, '')
       .replace(/\./g, '')
       .replace(',', '.')
   )
 }
 
 export function parseBrazilianPercent(value: string): number {
-  const parsed = parseFloat(value.replace(',', '.'))
-  return parsed
+  const num = parseBrazilianNumber(value.replace('%', ''))
+  return num
 }

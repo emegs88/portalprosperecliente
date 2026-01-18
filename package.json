@@ -3,25 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "prisma generate && next dev",
+    "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "prisma generate",
-    "vercel-build": "prisma generate && prisma migrate deploy && next build",
-    "db:migrate": "prisma migrate dev",
-    "db:generate": "prisma generate",
-    "seed": "tsx prisma/seed.ts",
-    "db:seed": "tsx prisma/seed.ts",
-    "db:seed:real": "tsx scripts/import-real-data.ts",
-    "db:seed:rafael": "tsx scripts/seed-rafael.ts",
-    "db:reset-senhas": "tsx scripts/reset-senhas.ts",
-    "db:verificar": "tsx scripts/verificar-dados.ts",
-    "db:studio": "prisma studio"
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^5.7.1",
-    "pg": "^8.11.3",
     "@radix-ui/react-checkbox": "^1.0.4",
     "@radix-ui/react-dialog": "^1.0.5",
     "@radix-ui/react-dropdown-menu": "^2.0.6",
@@ -42,6 +31,7 @@
     "pdf-parse": "^1.1.1",
     "pdf2pic": "^3.2.0",
     "pdfjs-dist": "^5.4.530",
+    "pg": "^8.11.3",
     "plotly.js": "^2.27.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -64,7 +54,6 @@
     "postcss": "^8.4.32",
     "prisma": "^5.7.1",
     "tailwindcss": "^3.4.0",
-    "tsx": "^4.7.0",
     "typescript": "^5.3.3"
   }
 }

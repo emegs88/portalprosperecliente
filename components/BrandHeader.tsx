@@ -1,21 +1,11 @@
-'use client'
-
 import { Logo } from './logo/Logo'
 
-interface BrandHeaderProps {
-  className?: string
-}
-
-export function BrandHeader({ className = '' }: BrandHeaderProps) {
+export function BrandHeader() {
   return (
-    <div className={`flex items-center gap-4 ${className}`}>
-      {/* Logo - usando componente existente */}
-      <Logo size="md" />
-      
-      {/* Nome da marca */}
-      <div className="hidden sm:block">
-        <h1 className="text-xl font-bold text-white">Consórcios Prospere</h1>
+    <header className="bg-gray-800 border-b border-gray-700">
+      <div className="container mx-auto px-4 py-4">
+        <Logo size="md" />
       </div>
-    </div>
+    </header>
   )
 }

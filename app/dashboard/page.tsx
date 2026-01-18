@@ -1,125 +1,84 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Card, CardContent } from '@/components/ui/card'
-import DashboardTab from '@/components/dashboard/DashboardTab'
-import CotasTab from '@/components/dashboard/CotasTab'
-import ImportacoesTab from '@/components/dashboard/ImportacoesTab'
-import PatrimonioTab from '@/components/dashboard/PatrimonioTab'
-import SimulacoesTab from '@/components/dashboard/SimulacoesTab'
-import ProspereVidaTab from '@/components/dashboard/ProspereVidaTab'
-import { Logo } from '@/components/logo/Logo'
+import { DashboardTab } from '@/components/dashboard/DashboardTab'
+import { CotasTab } from '@/components/dashboard/CotasTab'
+import { ImportacoesTab } from '@/components/dashboard/ImportacoesTab'
+import { PatrimonioTab } from '@/components/dashboard/PatrimonioTab'
+import { ProspereVidaTab } from '@/components/dashboard/ProspereVidaTab'
+import { SimulacoesTab } from '@/components/dashboard/SimulacoesTab'
+import { BrandHeader } from '@/components/BrandHeader'
 import { LogoutButton } from '@/components/LogoutButton'
 
 export default function DashboardPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const [mounted, setMounted] = useState(false)
-  const [activeTab, setActiveTab] = useState('dashboard')
-
-  useEffect(() => {
-    setMounted(true)
-    // Verificar query params para definir aba ativa
+  const searchParams = useSearchParams()
+  const [activeTab, setActiveTab] = useState(() => {
     if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search)
-      const tab = params.get('tab')
-      if (tab) {
-        setActiveTab(tab)
-      }
+      return searchParams.get('tab') || 'dashboard'
     }
-  }, [])
+    return 'dashboard'
+  })
 
-  // Redirecionar para login se não autenticado (após montar)
   useEffect(() => {
-    if (mounted && status === 'unauthenticated') {
+    if (status === 'unauthenticated') {
       router.push('/login')
     }
-  }, [mounted, status, router])
+  }, [status, router])
 
-  // Sempre renderizar o dashboard - não bloquear renderização
-  // O NextAuth vai atualizar em background
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-white">Carregando...</div>
+      </div>
+    )
+  }
+
+  if (!session) {
+    return null
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
-      {/* Header */}
-      <header className="border-b border-red-600/20 bg-black/50 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <Logo size="md" />
-            <div className="flex items-center gap-4">
-              <div className="text-white">
-                <p className="text-sm">{session?.user?.name || 'Usuário'}</p>
-                <p className="text-xs text-gray-400">Investidor Diamante</p>
-              </div>
-              <LogoutButton />
-            </div>
-          </div>
+    <div className="min-h-screen bg-gray-900">
+      <BrandHeader />
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold text-white">Dashboard</h1>
+          <LogoutButton />
         </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="bg-black/50 border border-red-600/20">
-            <TabsTrigger value="dashboard" className="data-[state=active]:bg-primary">
-              Dashboard
-            </TabsTrigger>
-            <TabsTrigger value="cotas" className="data-[state=active]:bg-primary">
-              Minhas Cotas
-            </TabsTrigger>
-            <TabsTrigger value="patrimonio" className="data-[state=active]:bg-primary">
-              Patrimônio
-            </TabsTrigger>
-            <TabsTrigger value="simulacoes" className="data-[state=active]:bg-primary">
-              Simulações
-            </TabsTrigger>
-            <TabsTrigger value="importacoes" className="data-[state=active]:bg-primary">
-              Importações
-            </TabsTrigger>
-            <TabsTrigger value="prospere-vida" className="data-[state=active]:bg-primary">
-              Prospere Vida
-            </TabsTrigger>
-            <TabsTrigger value="documentos" className="data-[state=active]:bg-primary">
-              Documentos
-            </TabsTrigger>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-6 bg-gray-800">
+            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+            <TabsTrigger value="cotas">Cotas</TabsTrigger>
+            <TabsTrigger value="importacoes">Importações</TabsTrigger>
+            <TabsTrigger value="patrimonio">Patrimônio</TabsTrigger>
+            <TabsTrigger value="prospere-vida">Prospere Vida</TabsTrigger>
+            <TabsTrigger value="simulacoes">Simulações</TabsTrigger>
           </TabsList>
-
-          <TabsContent value="dashboard">
+          <TabsContent value="dashboard" className="mt-6">
             <DashboardTab />
           </TabsContent>
-
-          <TabsContent value="cotas">
+          <TabsContent value="cotas" className="mt-6">
             <CotasTab />
           </TabsContent>
-
-          <TabsContent value="patrimonio">
-            <PatrimonioTab />
-          </TabsContent>
-
-          <TabsContent value="simulacoes">
-            <SimulacoesTab />
-          </TabsContent>
-
-          <TabsContent value="importacoes">
+          <TabsContent value="importacoes" className="mt-6">
             <ImportacoesTab />
           </TabsContent>
-
-          <TabsContent value="prospere-vida">
+          <TabsContent value="patrimonio" className="mt-6">
+            <PatrimonioTab />
+          </TabsContent>
+          <TabsContent value="prospere-vida" className="mt-6">
             <ProspereVidaTab />
           </TabsContent>
-
-          <TabsContent value="documentos">
-            <Card className="bg-black/50 border-red-600/20">
-              <CardContent className="p-6">
-                <h2 className="text-xl font-bold text-white mb-4">Documentos</h2>
-                <p className="text-gray-400">Em desenvolvimento...</p>
-              </CardContent>
-            </Card>
+          <TabsContent value="simulacoes" className="mt-6">
+            <SimulacoesTab />
           </TabsContent>
         </Tabs>
-      </main>
+      </div>
     </div>
   )
 }

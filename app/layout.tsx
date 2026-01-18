@@ -6,8 +6,8 @@ import { Providers } from './providers'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Portal do Cliente Prospere',
-  description: 'Gestão de Consórcios - Grupo Prospere',
+  title: 'Portal Cliente Prospere',
+  description: 'Portal do cliente Prospere Consórcios',
 }
 
 export default function RootLayout({
@@ -16,8 +16,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="pt-BR" className="dark">
-      <body className={`${inter.className} antialiased`}>
+    <html lang="pt-BR">
+      <body className={inter.className}>
         <Providers>{children}</Providers>
       </body>
     </html>

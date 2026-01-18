@@ -1,6 +1,6 @@
 import { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
-import { prisma } from '@/lib/prisma'
+import { prisma } from './prisma'
 import bcrypt from 'bcryptjs'
 
 export const authOptions: NextAuthOptions = {
@@ -8,37 +8,33 @@ export const authOptions: NextAuthOptions = {
     CredentialsProvider({
       name: 'Credentials',
       credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" }
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
         try {
           if (!credentials?.email || !credentials?.password) {
+            console.log('❌ Credenciais faltando')
             return null
           }
 
-          const email = credentials.email.trim().toLowerCase()
-
-          // Buscar usuário no banco
           const user = await prisma.user.findUnique({
-            where: { email },
-            include: { clientProfile: true },
+            where: { email: credentials.email },
           })
 
           if (!user) {
+            console.log(`❌ Usuário não encontrado: ${credentials.email}`)
             return null
           }
 
-          // Verificar senha
-          const passwordMatch = await bcrypt.compare(credentials.password, user.passwordHash)
+          const isValid = await bcrypt.compare(credentials.password, user.passwordHash)
 
-          if (!passwordMatch) {
-            console.error('❌ Senha incorreta para:', email)
+          if (!isValid) {
+            console.log(`❌ Senha incorreta para: ${credentials.email}`)
             return null
           }
 
-          console.log('✅ Login bem-sucedido para:', email)
-
+          console.log(`✅ Login bem-sucedido para: ${credentials.email}`)
           return {
             id: user.id,
             email: user.email,
@@ -46,38 +42,32 @@ export const authOptions: NextAuthOptions = {
             role: user.role,
           }
         } catch (error) {
-          console.error('Erro no authorize:', error)
+          console.error('❌ Erro no authorize:', error)
           return null
         }
-      }
-    })
+      },
+    }),
   ],
-  session: {
-    strategy: 'jwt',
-  },
   pages: {
     signIn: '/login',
+  },
+  session: {
+    strategy: 'jwt',
   },
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id
-        token.email = user.email
-        token.name = user.name
-        token.role = (user as any).role // Incluir role no token
+        token.role = (user as any).role
       }
       return token
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string
-        session.user.email = token.email as string
-        session.user.name = token.name as string
-        ;(session.user as any).role = token.role // Incluir role na sessão
+        session.user.role = token.role as string
       }
       return session
-    }
+    },
   },
-  secret: process.env.NEXTAUTH_SECRET || 'prospere-temp-secret',
-  debug: process.env.NODE_ENV === 'development',
 }

@@ -6,23 +6,21 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id           String    @id @default(cuid())
+  id           String         @id @default(cuid())
   name         String
-  email        String    @unique
+  email        String         @unique
   passwordHash String
-  role         String    @default("client") // "client" ou "admin"
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  
-  clientProfile  ClientProfile?
-  importBatches  ImportBatch[]
-  quotas         Quota[]
-  importJobs     ImportJob[]
+  role         String         @default("client")
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  clientProfile ClientProfile?
+  importBatches ImportBatch[]
+  quotas       Quota[]
 }
 
 model ClientProfile {
@@ -30,31 +28,29 @@ model ClientProfile {
   userId        String   @unique
   nome          String
   documento     String
-  administradora String?  // Administradora extraída do extrato
+  administradora String?
   empresa       String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-  
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model ImportBatch {
-  id         String   @id @default(cuid())
+  id         String        @id @default(cuid())
   userId     String
-  sourceType String   @default("PDF") // "PDF" ou "XLSX"
+  sourceType String        @default("PDF")
   filename   String
-  status     String   // "processing", "completed", "failed", "pending_review"
+  status     String
   parsedAt   DateTime?
-  createdAt  DateTime @default(now())
-  errorsJson String?  // JSON array de erros
-  
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  quotas         Quota[]
-  importTotals   ImportTotals?
+  createdAt  DateTime      @default(now())
+  errorsJson String?
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quotas     Quota[]
+  totals     ImportTotals?
 }
 
 model Quota {
-  id                String   @id @default(cuid())
+  id                String       @id @default(cuid())
   userId            String
   importBatchId     String
   administradora    String?
@@ -62,7 +58,7 @@ model Quota {
   grupo             String
   cota              String
   versao            String
-  dataVenda         String   // dd/mm/yyyy
+  dataVenda         String
   situacaoCobranca  String
   contemplacao      String
   percentPago       Float
@@ -77,72 +73,24 @@ model Quota {
   vlParcela         Float
   vlQuitacao        Float
   vlReceber         Float
-  tipoBem           String?  // "IMOVEL" ou "OUTROS"
-  needsReview       Boolean  @default(false)
-  createdAt         DateTime @default(now())
-  
-  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  importBatch      ImportBatch      @relation(fields: [importBatchId], references: [id], onDelete: Cascade)
-  paymentHistory   PaymentHistory[]
-  yieldHistory     YieldHistory[]
-  
+  tipoBem           String?
+  needsReview       Boolean      @default(false)
+  createdAt         DateTime     @default(now())
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  importBatch       ImportBatch  @relation(fields: [importBatchId], references: [id], onDelete: Cascade)
+
   @@index([userId])
   @@index([importBatchId])
   @@index([grupo, cota])
 }
 
 model ImportTotals {
-  id              String   @id @default(cuid())
-  importBatchId   String   @unique
-  totalCotas      Int
-  totalVlBem      Float
-  totalVlParcela  Float
+  id            String      @id @default(cuid())
+  importBatchId String      @unique
+  totalCotas    Int
+  totalVlBem    Float
+  totalVlParcela Float
   totalVlQuitacao Float
-  totalVlReceber  Float
-  
-  importBatch ImportBatch @relation(fields: [importBatchId], references: [id], onDelete: Cascade)
-}
-
-model PaymentHistory {
-  id          String   @id @default(cuid())
-  quotaId     String
-  mes         String   // "YYYY-MM" formato
-  parcela     Float
-  paga        Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  
-  quota Quota @relation(fields: [quotaId], references: [id], onDelete: Cascade)
-  
-  @@index([quotaId])
-  @@index([mes])
-}
-
-model YieldHistory {
-  id        String   @id @default(cuid())
-  quotaId   String
-  mes       String   // "YYYY-MM" formato
-  valor     Float
-  createdAt DateTime @default(now())
-  
-  quota Quota @relation(fields: [quotaId], references: [id], onDelete: Cascade)
-  
-  @@index([quotaId])
-  @@index([mes])
-}
-
-model ImportJob {
-  id          String   @id @default(cuid())
-  userId      String
-  status      String   // "PROCESSING", "DONE", "ERROR"
-  filename    String
-  rawText     String?
-  parsedJson  String?
-  errorMessage String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@index([userId])
-  @@index([status])
+  totalVlReceber Float
+  importBatch   ImportBatch @relation(fields: [importBatchId], references: [id], onDelete: Cascade)
 }

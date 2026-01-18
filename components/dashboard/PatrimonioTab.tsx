@@ -2,423 +2,245 @@
 
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Button } from '@/components/ui/button'
-import { Slider } from '@/components/ui/slider'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatCurrency, formatCurrencyCompact, formatPercent } from '@/lib/utils'
 import {
   LineChart,
   Line,
   AreaChart,
   Area,
-  BarChart,
-  Bar,
+  ComposedChart,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
-  ComposedChart,
 } from 'recharts'
-import { TrendingUp, DollarSign, Calendar, PieChart } from 'lucide-react'
+import { TrendingUp, DollarSign, Percent, Award } from 'lucide-react'
 
-interface PatrimonioData {
-  patrimonioBase: number
-  aporteMensal: number
-  valorPago: number
-  totalCotas: number
-}
-
-interface INCCData {
-  data: string
-  valor: number
-  variacaoMensal?: number
-}
-
-export default function PatrimonioTab() {
-  const [patrimonio, setPatrimonio] = useState<PatrimonioData | null>(null)
-  const [inccHistorico, setInccHistorico] = useState<INCCData[]>([])
-  const [projecao, setProjecao] = useState<any[]>([])
+export function PatrimonioTab() {
+  const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  
-  // Parâmetros da simulação
-  const [horizonte, setHorizonte] = useState(120) // meses
-  const [cenario, setCenario] = useState<'conservador' | 'realista' | 'otimista'>('realista')
-  const [aporteAdicional, setAporteAdicional] = useState(0)
 
   useEffect(() => {
-    fetchPatrimonio()
-    fetchINCC()
+    fetchData()
   }, [])
 
-  useEffect(() => {
-    if (patrimonio && inccHistorico.length > 0) {
-      calcularProjecao()
-    }
-  }, [patrimonio, inccHistorico, horizonte, cenario, aporteAdicional])
-
-  const fetchPatrimonio = async () => {
+  const fetchData = async () => {
     try {
-      const res = await fetch('/api/patrimonio')
-      const data = await res.json()
-      setPatrimonio(data)
+      const res = await fetch('/api/dashboard')
+      if (res.ok) {
+        const data = await res.json()
+        setData(data)
+      }
     } catch (error) {
-      console.error('Erro ao buscar patrimônio:', error)
+      console.error('Error fetching data:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  const fetchINCC = async () => {
-    try {
-      const res = await fetch('/api/incc')
-      const data = await res.json()
-      setInccHistorico(data.historico || [])
-    } catch (error) {
-      console.error('Erro ao buscar INCC:', error)
-    }
-  }
-
-  const calcularProjecao = () => {
-    if (!patrimonio) return
-
-    const cenarios = {
-      conservador: { incc: 4.5, aporte: 0.9 },
-      realista: { incc: 6.5, aporte: 1.0 },
-      otimista: { incc: 8.5, aporte: 1.1 },
-    }
-
-    const config = cenarios[cenario]
-    const taxaINCCAnual = config.incc / 100 // INCC aplicado ANUALMENTE, não mensalmente
-    const aporteMensalBase = patrimonio.aporteMensal * config.aporte
-    const aporteTotal = aporteMensalBase + aporteAdicional
-
-    const projecao = []
-    
-    // Patrimônio atual = valor já pago (parcelas pagas até agora)
-    let patrimonioAtual = patrimonio.valorPago // Começa com o que já foi pago
-    let totalPago = patrimonio.valorPago // Total já pago
-    let parcelaAtual = patrimonio.aporteMensal // Parcela atual (será reajustada anualmente com INCC)
-    let creditoAtual = patrimonio.patrimonioBase // Crédito atual (será reajustado anualmente com INCC)
-    
-    // Simula possível venda de cotas (ex: 30% das cotas vendidas após 5 anos)
-    const percentVendasCotas = 0.3 // 30% das cotas vendidas após 5 anos
-    const valorVendaPorCota = patrimonio.patrimonioBase / patrimonio.totalCotas
-    const receitaVenda = valorVendaPorCota * (patrimonio.totalCotas * percentVendasCotas)
-    const mesVenda = 60 // Mês 60 (5 anos) quando vende algumas cotas
-
-    for (let i = 1; i <= horizonte; i++) {
-      const anosCompletos = Math.floor(i / 12)
-      const ehAnoCompleto = i % 12 === 0
-      
-      // INCC aplicado ANUALMENTE (a cada 12 meses)
-      if (ehAnoCompleto && anosCompletos > 0) {
-        creditoAtual = creditoAtual * (1 + taxaINCCAnual)
-        parcelaAtual = parcelaAtual * (1 + taxaINCCAnual)
-      }
-      
-      // Aporte mensal (parcela paga)
-      totalPago += aporteTotal
-      
-      // Acumula patrimônio = valor já pago (parcelas pagas)
-      let patrimonioAcumulado = totalPago
-      
-      // Se chegou no mês de venda de cotas, adiciona receita da venda
-      if (i === mesVenda) {
-        patrimonioAcumulado += receitaVenda
-      }
-      
-      // Patrimônio projetado = Crédito valorizado com INCC
-      // O patrimônio final é o valor do crédito corrigido pelo INCC ao longo do tempo
-      // Este é o valor que o cliente terá quando contemplado ou quando finalizar o consórcio
-      const patrimonioProjetado = creditoAtual
-
-      // % pago = (total pago / patrimônio base) * 100
-      const percentPago = (totalPago / patrimonio.patrimonioBase) * 100
-      
-      // % pago para alcançar patrimônio base completo
-      const percentPagoPatrimonio = Math.min(100, percentPago)
-
-      projecao.push({
-        mes: i,
-        mesLabel: i <= 12 ? `M${i}` : i % 12 === 0 ? `${anosCompletos}A` : '',
-        patrimonio: patrimonioAcumulado, // Patrimônio acumulado (parcelas pagas + vendas)
-        patrimonioProjetado, // Projeção considerando crédito valorizado
-        totalPago, // Total já pago até esse mês
-        credito: creditoAtual, // Crédito com INCC anual
-        percentPago: percentPagoPatrimonio, // % pago do patrimônio base
-        parcelaAtual, // Parcela atual (com INCC aplicado anualmente)
-      })
-    }
-
-    setProjecao(projecao)
-  }
-
   if (loading) {
-    return <div className="text-white">Carregando...</div>
-  }
-
-  if (!patrimonio) {
     return (
-      <Card className="bg-black/50 border-red-600/20">
-        <CardContent className="p-6 text-center text-white">
-          <p>Nenhum dado disponível. Importe um PDF para começar.</p>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-center py-12">
+        <div className="text-white">Carregando dados...</div>
+      </div>
     )
   }
 
-  // Patrimônio Final = Patrimônio Projetado (considera crédito valorizado com INCC)
-  const patrimonioFinal = projecao[projecao.length - 1]?.patrimonioProjetado || patrimonio.patrimonioBase
-  const totalPagoFinal = projecao[projecao.length - 1]?.totalPago || patrimonio.valorPago
-  const percentPagoFinal = projecao[projecao.length - 1]?.percentPago || 0
-  const ganhoProjetado = patrimonioFinal - totalPagoFinal
+  if (!data) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-white">Erro ao carregar dados</div>
+      </div>
+    )
+  }
+
+  // Calcular ganho
+  const totalPagoAproximado = (data.totalParcelaPagas || 0) * (data.monthlyInstallment || 0)
+  const ganhoPatrimonio = (data.patrimonioAcumulado || 0) - totalPagoAproximado
+  const roi = totalPagoAproximado > 0 
+    ? ((data.patrimonioAcumulado || 0) / totalPagoAproximado - 1) * 100 
+    : 0
+
+  // Dados para gráfico de evolução (simulado baseado em parcelas pagas)
+  const evolucaoData = Array.from({ length: 12 }, (_, i) => {
+    const mes = i + 1
+    const parcelaMes = (data.monthlyInstallment || 0) * mes
+    const percentMes = ((data.totalPercentPago || 0) / 12) * mes
+    const patrimonioMes = (data.totalCredit || 0) * (percentMes / 100) + 
+      (data.totalToReceive || 0) * (mes >= 6 ? 0.5 : 0) // Simula contemplação no mês 6
+    return {
+      mes,
+      mesLabel: `Mês ${mes}`,
+      totalPago: parcelaMes,
+      patrimonio: patrimonioMes,
+    }
+  })
 
   return (
     <div className="space-y-6">
-      {/* Cards Resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <Card className="bg-gradient-to-br from-cyan-500/20 to-cyan-500/5 border-cyan-500/30 overflow-hidden">
+      <div>
+        <h2 className="text-2xl font-bold text-white mb-2">Patrimônio Acumulado</h2>
+        <p className="text-gray-400">
+          Acompanhe a evolução do seu patrimônio no consórcio
+        </p>
+      </div>
+
+      {/* Cards Principais */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border-blue-500/50">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-gray-400 flex items-center gap-2">
-              <PieChart className="h-4 w-4 flex-shrink-0" />
-              <span className="truncate">Patrimônio Atual</span>
+            <CardTitle className="text-sm font-medium text-gray-300 flex items-center gap-2">
+              <DollarSign className="w-4 h-4" />
+              Patrimônio Acumulado
             </CardTitle>
           </CardHeader>
-          <CardContent className="min-h-0 overflow-hidden">
-            <p className="text-2xl md:text-xl lg:text-2xl font-bold text-cyan-500 break-words leading-tight">
-              {formatCurrencyCompact(patrimonio.valorPago).replace('R$', '').trim()}
+          <CardContent>
+            <div className="text-3xl font-bold text-green-400 break-words">
+              {formatCurrencyCompact(data.patrimonioAcumulado || 0)}
+            </div>
+            <p className="text-xs text-gray-400 mt-2">
+              Valor atual do patrimônio
             </p>
-            <p className="text-xs text-gray-500 mt-1 line-clamp-2">Valor já pago (parcelas)</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-gradient-to-br from-primary/20 to-primary/5 border-red-600/30 overflow-hidden">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-gray-400 flex items-center gap-2">
-              <DollarSign className="h-4 w-4 flex-shrink-0" />
-              <span className="truncate">Patrimônio Base</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="min-h-0 overflow-hidden">
-            <p className="text-2xl md:text-xl lg:text-2xl font-bold text-primary break-words leading-tight">
-              {formatCurrencyCompact(patrimonio.patrimonioBase).replace('R$', '').trim()}
-            </p>
-            <p className="text-xs text-gray-500 mt-1 line-clamp-2">Soma dos valores do bem</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-green-500/20 to-green-500/5 border-green-500/30 overflow-hidden">
+        <Card className="bg-gray-800 border-gray-700">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-gray-400 flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 flex-shrink-0" />
-              <span className="truncate">Aporte Mensal</span>
+            <CardTitle className="text-sm font-medium text-gray-400 flex items-center gap-2">
+              <TrendingUp className="w-4 h-4" />
+              Ganho de Patrimônio
             </CardTitle>
           </CardHeader>
-          <CardContent className="min-h-0 overflow-hidden">
-            <p className="text-2xl md:text-xl lg:text-2xl font-bold text-green-500 break-words leading-tight">
-              {formatCurrencyCompact(patrimonio.aporteMensal).replace('R$', '').trim()}
+          <CardContent>
+            <div className={`text-2xl font-bold break-words ${ganhoPatrimonio >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              {formatCurrencyCompact(ganhoPatrimonio)}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Diferença vs total pago
             </p>
-            <p className="text-xs text-gray-500 mt-1 line-clamp-2">Parcelas mensais totais</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-blue-500/20 to-blue-500/5 border-blue-500/30 overflow-hidden">
+        <Card className="bg-gray-800 border-gray-700">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-gray-400 flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 flex-shrink-0" />
-              <span className="truncate">Total Pago Projetado</span>
+            <CardTitle className="text-sm font-medium text-gray-400 flex items-center gap-2">
+              <Percent className="w-4 h-4" />
+              ROI
             </CardTitle>
           </CardHeader>
-          <CardContent className="min-h-0 overflow-hidden">
-            <p className="text-2xl md:text-xl lg:text-2xl font-bold text-blue-500 break-words leading-tight">
-              {formatCurrencyCompact(totalPagoFinal).replace('R$', '').trim()}
+          <CardContent>
+            <div className={`text-2xl font-bold ${roi >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              {formatPercent(roi)}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Retorno sobre investimento
             </p>
-            <p className="text-xs text-gray-500 mt-1 line-clamp-2">Quanto custará em {Math.floor(horizonte / 12)} anos</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-purple-500/20 to-purple-500/5 border-purple-500/30 overflow-hidden">
+        <Card className="bg-gray-800 border-gray-700">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-gray-400 flex items-center gap-2">
-              <PieChart className="h-4 w-4 flex-shrink-0" />
-              <span className="truncate">% Pago do Patrimônio</span>
+            <CardTitle className="text-sm font-medium text-gray-400 flex items-center gap-2">
+              <Award className="w-4 h-4" />
+              Total Pago (Aprox.)
             </CardTitle>
           </CardHeader>
-          <CardContent className="min-h-0 overflow-hidden">
-            <p className="text-2xl md:text-xl lg:text-2xl font-bold text-purple-500 break-words leading-tight">
-              {formatPercent(percentPagoFinal / 100)}
+          <CardContent>
+            <div className="text-2xl font-bold text-white break-words">
+              {formatCurrencyCompact(totalPagoAproximado)}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Parcelas pagas × Parcela mensal
             </p>
-            <p className="text-xs text-gray-500 mt-1 line-clamp-2">Percentual do patrimônio base</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-yellow-500/20 to-yellow-500/5 border-yellow-500/30 overflow-hidden">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-gray-400 flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 flex-shrink-0" />
-              <span className="truncate">Patrimônio Final</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="min-h-0 overflow-hidden">
-            <p className="text-2xl md:text-xl lg:text-2xl font-bold text-yellow-500 break-words leading-tight">
-              {formatCurrencyCompact(patrimonioFinal).replace('R$', '').trim()}
-            </p>
-            <p className="text-xs text-gray-500 mt-1 line-clamp-2">Valor do crédito corrigido pelo INCC após {Math.floor(horizonte / 12)} anos</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Controles */}
+      {/* Gráfico de Evolução */}
       <Card className="bg-black/50 border-red-600/20">
         <CardHeader>
-          <CardTitle className="text-white">Parâmetros da Simulação</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label className="text-white">Cenário</Label>
-              <Select value={cenario} onValueChange={(value: any) => setCenario(value)}>
-                <SelectTrigger className="bg-black border-red-600/20 text-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="conservador">Conservador (4.5% INCC)</SelectItem>
-                  <SelectItem value="realista">Realista (6.5% INCC)</SelectItem>
-                  <SelectItem value="otimista">Otimista (8.5% INCC)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-white">Horizonte: {horizonte} meses ({Math.floor(horizonte / 12)} anos)</Label>
-              <Slider
-                value={[horizonte]}
-                onValueChange={([value]) => setHorizonte(value)}
-                min={12}
-                max={240}
-                step={6}
-                className="w-full"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-white">Aporte Adicional Mensal (R$)</Label>
-              <Input
-                type="number"
-                value={aporteAdicional}
-                onChange={(e) => setAporteAdicional(Number(e.target.value))}
-                className="bg-black border-red-600/20 text-white"
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Informações sobre a Projeção */}
-      <Card className="bg-black/50 border-blue-600/30">
-        <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 w-2 h-2 rounded-full bg-blue-500 mt-2"></div>
-            <div className="text-sm text-gray-300">
-              <p className="font-semibold text-white mb-1">Como funciona a projeção:</p>
-              <ul className="list-disc list-inside space-y-1 text-gray-400">
-                <li><strong className="text-white">Patrimônio Atual:</strong> Valor já pago (parcelas pagas até agora: {formatCurrency(patrimonio.valorPago)})</li>
-                <li><strong className="text-white">Total Pago:</strong> Soma de todas as parcelas pagas ao longo do tempo</li>
-                <li><strong className="text-white">Patrimônio Final:</strong> Valor do crédito/propatrimônio corrigido pelo INCC ao longo do tempo - representa o valor que você terá quando contemplado</li>
-                <li><strong className="text-white">INCC:</strong> Aplicado anualmente (a cada 12 meses) no crédito e na parcela mensal</li>
-                <li><strong className="text-white">Venda de Cotas:</strong> Simulação de venda de 30% das cotas no mês 60 (5 anos) para fluxo de caixa</li>
-                <li><strong className="text-white">% Pago:</strong> Percentual do patrimônio base que já foi pago</li>
-              </ul>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Gráfico Principal: Evolução do Patrimônio */}
-      <Card className="bg-black/50 border-red-600/20">
-        <CardHeader>
-          <CardTitle className="text-white text-lg">Evolução Patrimonial Projetada</CardTitle>
-          <p className="text-sm text-gray-400">Baseado em parcelas pagas + INCC anual + possível venda de cotas</p>
+          <CardTitle className="text-white text-lg flex items-center gap-2">
+            <TrendingUp className="w-5 h-5" />
+            Evolução do Patrimônio
+          </CardTitle>
+          <p className="text-sm text-gray-400">
+            Projeção mensal do patrimônio acumulado
+          </p>
         </CardHeader>
         <CardContent>
-          <div className="w-full" style={{ height: '500px' }}>
+          <div className="w-full" style={{ height: '400px' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={projecao.filter((_, i) => i % 6 === 0 || i === projecao.length - 1)}>
+              <ComposedChart data={evolucaoData}>
                 <defs>
                   <linearGradient id="colorPatrimonio" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#DC2626" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#DC2626" stopOpacity={0.1}/>
-                  </linearGradient>
-                  <linearGradient id="colorTotalPago" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#10B981" stopOpacity={0.8}/>
                     <stop offset="95%" stopColor="#10B981" stopOpacity={0.1}/>
+                  </linearGradient>
+                  <linearGradient id="colorTotalPago" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#EF4444" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#EF4444" stopOpacity={0.1}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                 <XAxis 
-                  dataKey="mes" 
+                  dataKey="mesLabel" 
                   stroke="#999"
-                  tickFormatter={(value) => value <= 12 ? `M${value}` : `${Math.floor(value / 12)}A`}
+                  tick={{ fill: '#999', fontSize: 12 }}
                 />
                 <YAxis 
                   stroke="#999"
-                  tickFormatter={(value) => `R$ ${(value / 1000000).toFixed(1)}M`}
-                />
-                <YAxis 
-                  yAxisId="right"
-                  orientation="right"
-                  stroke="#F59E0B"
-                  tickFormatter={(value) => `${value.toFixed(0)}%`}
+                  tick={{ fill: '#999', fontSize: 12 }}
+                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
                 />
                 <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#1F1F1F',
-                    border: '1px solid #DC2626',
+                  formatter={(value: number, name: string) => [
+                    formatCurrency(value),
+                    name === 'patrimonio' ? 'Patrimônio' : 'Total Pago'
+                  ]}
+                  contentStyle={{ 
+                    backgroundColor: '#1F2937', 
+                    border: '1px solid #374151', 
                     borderRadius: '8px',
-                    color: '#fff',
-                    padding: '12px',
+                    color: '#F3F4F6'
                   }}
-                  formatter={(value: number, name: string) => {
-                    if (name === '% Pago') return `${value.toFixed(2)}%`
-                    return formatCurrency(value)
-                  }}
-                  labelFormatter={(label) => `Mês ${label}`}
+                  labelStyle={{ color: '#F3F4F6', marginBottom: '8px' }}
                 />
-                <Legend />
+                <Legend 
+                  wrapperStyle={{ color: '#999', paddingTop: '20px' }}
+                />
                 <Area
                   type="monotone"
-                  dataKey="patrimonioProjetado"
+                  dataKey="patrimonio"
                   fill="url(#colorPatrimonio)"
-                  stroke="#DC2626"
-                  strokeWidth={3}
-                  name="Patrimônio Final Projetado"
+                  stroke="#10B981"
+                  strokeWidth={2}
+                  name="Patrimônio Acumulado"
                 />
                 <Area
                   type="monotone"
                   dataKey="totalPago"
                   fill="url(#colorTotalPago)"
-                  stroke="#10B981"
+                  stroke="#EF4444"
                   strokeWidth={2}
                   name="Total Pago"
                 />
                 <Line
                   type="monotone"
                   dataKey="patrimonio"
-                  stroke="#06B6D4"
-                  strokeWidth={2}
-                  strokeDasharray="5 5"
-                  name="Patrimônio Acumulado (Parcelas)"
+                  stroke="#059669"
+                  strokeWidth={3}
+                  dot={{ fill: '#059669', r: 4 }}
+                  activeDot={{ r: 6 }}
                 />
                 <Line
                   type="monotone"
-                  dataKey="percentPago"
-                  yAxisId="right"
-                  stroke="#F59E0B"
-                  strokeWidth={2}
-                  name="% Pago do Patrimônio"
+                  dataKey="totalPago"
+                  stroke="#DC2626"
+                  strokeWidth={3}
+                  dot={{ fill: '#DC2626', r: 4 }}
+                  activeDot={{ r: 6 }}
                 />
               </ComposedChart>
             </ResponsiveContainer>
@@ -426,83 +248,41 @@ export default function PatrimonioTab() {
         </CardContent>
       </Card>
 
-      {/* Gráfico: Histórico INCC */}
-      {inccHistorico.length > 0 && (
-        <Card className="bg-black/50 border-red-600/20">
-          <CardHeader>
-            <CardTitle className="text-white text-lg">Histórico INCC - Últimos 12 Meses</CardTitle>
-            <p className="text-sm text-gray-400">Índice Nacional de Custo da Construção</p>
-          </CardHeader>
-          <CardContent>
-            <div className="w-full" style={{ height: '300px' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={inccHistorico}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                  <XAxis dataKey="data" stroke="#999" />
-                  <YAxis 
-                    stroke="#999"
-                    tickFormatter={(value) => `${value.toFixed(2)}%`}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#1F1F1F',
-                      border: '1px solid #DC2626',
-                      color: '#fff',
-                    }}
-                    formatter={(value: number) => `${value.toFixed(2)}%`}
-                  />
-                  <Bar dataKey="valor" fill="#DC2626" name="INCC Mensal (%)" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Comparação de Cenários */}
-      <Card className="bg-black/50 border-red-600/20">
+      {/* Resumo Detalhado */}
+      <Card className="bg-gradient-to-r from-purple-900/20 to-blue-900/20 border-purple-500/50">
         <CardHeader>
-          <CardTitle className="text-white text-lg">Comparação de Cenários</CardTitle>
+          <CardTitle className="text-white text-xl">Resumo do Patrimônio</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="w-full" style={{ height: '400px' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={projecao.filter((_, i) => i % 12 === 0)}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                <XAxis 
-                  dataKey="mes" 
-                  stroke="#999"
-                  tickFormatter={(value) => `${Math.floor(value / 12)}A`}
-                />
-                <YAxis 
-                  stroke="#999"
-                  tickFormatter={(value) => `R$ ${(value / 1000000).toFixed(1)}M`}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#1F1F1F',
-                    border: '1px solid #DC2626',
-                    color: '#fff',
-                  }}
-                  formatter={(value: number) => formatCurrency(value)}
-                />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="patrimonioProjetado"
-                  stroke="#DC2626"
-                  strokeWidth={3}
-                  name="Patrimônio Final Projetado"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="totalPago"
-                  stroke="#10B981"
-                  strokeWidth={2}
-                  name="Total Pago"
-                />
-              </LineChart>
-            </ResponsiveContainer>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-400 mb-1">Total de Cotas</p>
+                <p className="text-2xl font-bold text-white">{data.totalCotas || 0}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-400 mb-1">Cotas Contempladas</p>
+                <p className="text-2xl font-bold text-green-400">{data.cotasContempladas || 0}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-400 mb-1">% Médio Pago</p>
+                <p className="text-2xl font-bold text-white">{formatPercent(data.totalPercentPago || 0)}</p>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-400 mb-1">Crédito Total</p>
+                <p className="text-2xl font-bold text-white">{formatCurrency(data.totalCredit || 0)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-400 mb-1">Valor a Receber</p>
+                <p className="text-2xl font-bold text-green-400">{formatCurrency(data.totalToReceive || 0)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-400 mb-1">Parcela Mensal</p>
+                <p className="text-2xl font-bold text-white">{formatCurrency(data.monthlyInstallment || 0)}</p>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

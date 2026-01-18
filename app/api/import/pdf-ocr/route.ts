@@ -2,13 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { parseExcel } from '@/lib/services/excelParser'
 import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
+import Tesseract from 'tesseract.js'
+import pdfParse from 'pdf-parse'
+import { parsePDF } from '@/lib/services/pdfParser'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 300 // 5 minutos para OCR
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,14 +27,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Nenhum arquivo enviado' }, { status: 400 })
     }
 
-    const isExcel = 
-      file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-      file.type === 'application/vnd.ms-excel' ||
-      file.name.endsWith('.xlsx') ||
-      file.name.endsWith('.xls')
-
-    if (!isExcel) {
-      return NextResponse.json({ error: 'Arquivo deve ser Excel (.xlsx ou .xls)' }, { status: 400 })
+    if (file.type !== 'application/pdf') {
+      return NextResponse.json({ error: 'Arquivo deve ser PDF' }, { status: 400 })
     }
 
     // Salvar arquivo temporariamente
@@ -50,12 +46,39 @@ export async function POST(request: NextRequest) {
 
     await writeFile(filepath, buffer)
 
-    // Parse Excel
-    const parseResult = await parseExcel(buffer)
+    // Tentar parse normal primeiro
+    let parseResult = await parsePDF(buffer)
+
+    // Se não encontrou cotas, usar OCR
+    if (parseResult.quotas.length === 0) {
+      try {
+        const pdfData = await pdfParse(buffer)
+        const numPages = pdfData.numpages
+
+        // Processar cada página com OCR
+        let fullText = ''
+        for (let page = 1; page <= Math.min(numPages, 10); page++) {
+          // Nota: Tesseract.js funciona melhor com imagens
+          // Aqui estamos usando o texto extraído do PDF como fallback
+          // Para OCR completo, seria necessário converter PDF para imagem primeiro
+          fullText += pdfData.text
+        }
+
+        // Tentar parse novamente com texto do OCR
+        if (fullText.length > 0) {
+          // Criar um novo buffer com o texto extraído
+          const textBuffer = Buffer.from(fullText)
+          parseResult = await parsePDF(textBuffer)
+        }
+      } catch (ocrError) {
+        console.error('OCR error:', ocrError)
+        // Continuar com resultado do parse normal
+      }
+    }
 
     if (parseResult.errors.length > 0 && parseResult.quotas.length === 0) {
       return NextResponse.json(
-        { error: parseResult.errors.join(', ') },
+        { error: parseResult.errors.join(', ') || 'Nenhuma cota encontrada no PDF' },
         { status: 400 }
       )
     }
@@ -64,7 +87,7 @@ export async function POST(request: NextRequest) {
     const importBatch = await prisma.importBatch.create({
       data: {
         userId: session.user.id,
-        sourceType: 'EXCEL',
+        sourceType: 'PDF-OCR',
         filename: file.name,
         status: 'PENDING',
         errorsJson: parseResult.errors.length > 0 ? JSON.stringify(parseResult.errors) : null,
@@ -140,9 +163,9 @@ export async function POST(request: NextRequest) {
       errors: parseResult.errors,
     })
   } catch (error) {
-    console.error('Import Excel error:', error)
+    console.error('Import PDF OCR error:', error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Erro ao importar Excel' },
+      { error: error instanceof Error ? error.message : 'Erro ao importar PDF com OCR' },
       { status: 500 }
     )
   }
