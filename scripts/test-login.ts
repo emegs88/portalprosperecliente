@@ -19,9 +19,13 @@ async function main() {
 
     console.log('✅ Usuário encontrado:', user.email)
     console.log('📝 Nome:', user.name)
-    console.log('🔐 Hash da senha:', user.passwordHash.substring(0, 20) + '...')
+    console.log('🔐 Hash da senha:', user.passwordHash?.substring(0, 20) + '...' || 'N/A')
 
     // Testar senha
+    if (!user.passwordHash) {
+      console.log('❌ Usuário não tem senha cadastrada')
+      process.exit(1)
+    }
     const isValid = await bcrypt.compare(testPassword, user.passwordHash)
     console.log('🔑 Teste de senha:', isValid ? '✅ CORRETO' : '❌ INCORRETO')
 
