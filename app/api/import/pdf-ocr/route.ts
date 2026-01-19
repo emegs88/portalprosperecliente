@@ -5,8 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
-import Tesseract from 'tesseract.js'
-import pdfParse from 'pdf-parse'
+import { parsePDFWithOCR, ParsedQuota } from '@/lib/services/pdfParserWithOCR'
 import { parsePDF } from '@/lib/services/pdfParser'
 
 export const dynamic = 'force-dynamic'
@@ -49,30 +48,54 @@ export async function POST(request: NextRequest) {
     // Tentar parse normal primeiro
     let parseResult = await parsePDF(buffer)
 
-    // Se não encontrou cotas, usar OCR
+    // Se não encontrou cotas, tentar com OCR melhorado
     if (parseResult.quotas.length === 0) {
       try {
-        const pdfData = await pdfParse(buffer)
-        const numPages = pdfData.numpages
-
-        // Processar cada página com OCR
-        let fullText = ''
-        for (let page = 1; page <= Math.min(numPages, 10); page++) {
-          // Nota: Tesseract.js funciona melhor com imagens
-          // Aqui estamos usando o texto extraído do PDF como fallback
-          // Para OCR completo, seria necessário converter PDF para imagem primeiro
-          fullText += pdfData.text
-        }
-
-        // Tentar parse novamente com texto do OCR
-        if (fullText.length > 0) {
-          // Criar um novo buffer com o texto extraído
-          const textBuffer = Buffer.from(fullText)
-          parseResult = await parsePDF(textBuffer)
-        }
+        console.log('Nenhuma cota encontrada, tentando OCR melhorado...')
+        parseResult = await parsePDFWithOCR(buffer, true)
       } catch (ocrError) {
         console.error('OCR error:', ocrError)
-        // Continuar com resultado do parse normal
+        // Se OCR falhar, tentar parse melhorado sem OCR
+        try {
+          parseResult = await parsePDFWithOCR(buffer, false)
+        } catch (fallbackError) {
+          console.error('Fallback parse error:', fallbackError)
+          // Continuar com resultado original
+        }
+      }
+    } else {
+      // Mesmo se encontrou cotas, validar se estão completas
+      const incompleteQuotas = parseResult.quotas.filter(q => !q.vlBem || !q.vlParcela)
+      if (incompleteQuotas.length > 0) {
+        console.log(`${incompleteQuotas.length} cotas incompletas encontradas, tentando OCR melhorado...`)
+        try {
+          const ocrResult = await parsePDFWithOCR(buffer, true)
+          // Combinar resultados, priorizando OCR para cotas incompletas
+          if (ocrResult.quotas.length > 0) {
+            // Mesclar resultados
+            const quotaMap = new Map<string, ParsedQuota>()
+            parseResult.quotas.forEach(q => {
+              const key = `${q.grupo}-${q.cota}`
+              quotaMap.set(key, q)
+            })
+            ocrResult.quotas.forEach(q => {
+              const key = `${q.grupo}-${q.cota}`
+              const existing = quotaMap.get(key)
+              if (existing) {
+                // Completar dados faltantes
+                if (!existing.vlBem && q.vlBem) existing.vlBem = q.vlBem
+                if (!existing.vlParcela && q.vlParcela) existing.vlParcela = q.vlParcela
+                if (!existing.vlReceber && q.vlReceber) existing.vlReceber = q.vlReceber
+                if (!existing.percentPago && q.percentPago) existing.percentPago = q.percentPago
+              } else {
+                quotaMap.set(key, q)
+              }
+            })
+            parseResult.quotas = Array.from(quotaMap.values())
+          }
+        } catch (mergeError) {
+          console.error('Merge error:', mergeError)
+        }
       }
     }
 
