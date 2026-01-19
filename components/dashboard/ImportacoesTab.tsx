@@ -77,7 +77,10 @@ export function ImportacoesTab() {
         formData.append('useOCR', 'true')
       }
 
+      // Sempre usar endpoint de OCR quando marcado, senão usar pdf normal
       const endpoint = isExcel ? '/api/import/excel' : useOCR ? '/api/import/pdf-ocr' : '/api/import/pdf'
+      
+      console.log('📤 Enviando para:', endpoint, { useOCR, isExcel })
 
       const response = await fetch(endpoint, {
         method: 'POST',
