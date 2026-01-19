@@ -15,6 +15,8 @@ import { ProspereClubTab } from '@/components/dashboard/ProspereClubTab'
 import { BrandHeader } from '@/components/BrandHeader'
 import { LogoutButton } from '@/components/LogoutButton'
 import { NavigationCard } from '@/components/dashboard/NavigationCard'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { ErrorFallback } from '@/components/dashboard/ErrorFallback'
 import { Crown, Dice6, TrendingUp, FileText } from 'lucide-react'
 
 export default function DashboardPage() {
@@ -161,28 +163,44 @@ export default function DashboardPage() {
             </TabsTrigger>
           </TabsList>
           <TabsContent value="dashboard" className="mt-6">
-            <DashboardTab />
+            <ErrorBoundary fallback={ErrorFallback}>
+              <DashboardTab />
+            </ErrorBoundary>
           </TabsContent>
           <TabsContent value="prospere-club" className="mt-6">
-            <ProspereClubTab />
+            <ErrorBoundary fallback={ErrorFallback}>
+              <ProspereClubTab />
+            </ErrorBoundary>
           </TabsContent>
           <TabsContent value="cotas" className="mt-6">
-            <CotasTab />
+            <ErrorBoundary fallback={ErrorFallback}>
+              <CotasTab />
+            </ErrorBoundary>
           </TabsContent>
           <TabsContent value="importacoes" className="mt-6">
-            <ImportacoesTab />
+            <ErrorBoundary fallback={ErrorFallback}>
+              <ImportacoesTab />
+            </ErrorBoundary>
           </TabsContent>
           <TabsContent value="patrimonio" className="mt-6">
-            <PatrimonioTab />
+            <ErrorBoundary fallback={ErrorFallback}>
+              <PatrimonioTab />
+            </ErrorBoundary>
           </TabsContent>
           <TabsContent value="prospere-vida" className="mt-6">
-            <ProspereVidaTab />
+            <ErrorBoundary fallback={ErrorFallback}>
+              <ProspereVidaTab />
+            </ErrorBoundary>
           </TabsContent>
           <TabsContent value="simulacoes" className="mt-6">
-            <SimulacoesTab />
+            <ErrorBoundary fallback={ErrorFallback}>
+              <SimulacoesTab />
+            </ErrorBoundary>
           </TabsContent>
           <TabsContent value="plano-carreira" className="mt-6">
-            <PlanoCarreiraTab />
+            <ErrorBoundary fallback={ErrorFallback}>
+              <PlanoCarreiraTab />
+            </ErrorBoundary>
           </TabsContent>
         </Tabs>
       </div>

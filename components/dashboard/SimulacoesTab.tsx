@@ -60,16 +60,28 @@ export function SimulacoesTab() {
   })
 
   const [results, setResults] = useState<any>(null)
+  const [calculating, setCalculating] = useState(false)
 
   useEffect(() => {
     fetchQuotas()
   }, [])
 
+  // Memoizar cotas selecionadas
+  const selectedQuotasArray = useMemo(() => {
+    return quotas.filter(q => selectedQuotas.has(q.id))
+  }, [quotas, selectedQuotas])
+
+  // Debounce para cálculos - evitar recálculos desnecessários
   useEffect(() => {
-    if (quotas.length > 0 && selectedQuotas.size > 0) {
-      calculateSimulation()
+    if (quotas.length > 0 && selectedQuotas.size > 0 && !loading) {
+      const timer = setTimeout(() => {
+        calculateSimulation()
+      }, 300) // Debounce de 300ms
+
+      return () => clearTimeout(timer)
     }
-  }, [quotas, selectedQuotas, params])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quotas.length, selectedQuotas.size, JSON.stringify(params)])
 
   const fetchQuotas = async () => {
     try {
@@ -121,13 +133,15 @@ export function SimulacoesTab() {
     setSelectedQuotas(new Set())
   }
 
-  const calculateSimulation = () => {
+  const calculateSimulation = useCallback(() => {
     if (quotas.length === 0 || selectedQuotas.size === 0) {
       setResults(null)
       return
     }
 
-    const selectedQuotasData = quotas.filter(q => selectedQuotas.has(q.id))
+    try {
+      setCalculating(true)
+      const selectedQuotasData = quotas.filter(q => selectedQuotas.has(q.id))
     const totalCotas = selectedQuotasData.length
     const vlParcelaTotal = selectedQuotasData.reduce((sum, q) => sum + q.vlParcela, 0)
     const vlBemTotal = selectedQuotasData.reduce((sum, q) => sum + q.vlBem, 0)
