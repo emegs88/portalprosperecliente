@@ -1,0 +1,61 @@
+{
+  "version": "1.0.0",
+  "range": {
+    "min": 0,
+    "max": 99
+  },
+  "draw": {
+    "count": 3,
+    "seed": null
+  },
+  "trio": {
+    "size": 3,
+    "minTrios": 1,
+    "maxTrios": 10
+  },
+  "selection": {
+    "maxSelected": 30,
+    "enableSearch": true,
+    "enableQuickSelect": true
+  },
+  "animation": {
+    "speed": "medium",
+    "enableSounds": true,
+    "soundVolume": 0.7,
+    "enableConfetti": true,
+    "revealDelay": 1000
+  },
+  "features": {
+    "enableHistory": true,
+    "enableStats": true,
+    "enableEducativeText": true
+  },
+  "modes": {
+    "rapido": {
+      "enabled": true,
+      "trioCount": 1,
+      "drawCount": 3
+    },
+    "completo": {
+      "enabled": true,
+      "trioCount": 5,
+      "drawCount": 3
+    },
+    "sala": {
+      "enabled": true,
+      "trioCount": 10,
+      "drawCount": 3,
+      "enableFullScreen": true,
+      "enableRanking": true
+    }
+  },
+  "ui": {
+    "theme": "dark",
+    "fontSize": "medium",
+    "language": "pt-BR"
+  },
+  "disclaimer": {
+    "text": "Simulação educativa. Não representa resultados reais ou garantia de contemplação.",
+    "alwaysVisible": true
+  }
+}
