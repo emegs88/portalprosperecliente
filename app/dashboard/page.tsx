@@ -14,6 +14,8 @@ import { PlanoCarreiraTab } from '@/components/dashboard/PlanoCarreiraTab'
 import { ProspereClubTab } from '@/components/dashboard/ProspereClubTab'
 import { BrandHeader } from '@/components/BrandHeader'
 import { LogoutButton } from '@/components/LogoutButton'
+import { NavigationCard } from '@/components/dashboard/NavigationCard'
+import { Crown, Dice6, TrendingUp, FileText } from 'lucide-react'
 
 export default function DashboardPage() {
   const { data: session, status } = useSession()
@@ -31,6 +33,14 @@ export default function DashboardPage() {
       router.push('/login')
     }
   }, [status, router])
+
+  useEffect(() => {
+    // Atualizar tab ativa quando URL mudar
+    const tab = searchParams.get('tab')
+    if (tab && tab !== activeTab) {
+      setActiveTab(tab)
+    }
+  }, [searchParams, activeTab])
 
   useEffect(() => {
     // Atualizar tab ativa quando URL mudar
@@ -92,16 +102,63 @@ export default function DashboardPage() {
             icon={<FileText className="w-6 h-6" />}
           />
         </div>
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-8 bg-gray-800">
-            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-            <TabsTrigger value="prospere-club">Prospere Club</TabsTrigger>
-            <TabsTrigger value="cotas">Cotas</TabsTrigger>
-            <TabsTrigger value="importacoes">Importações</TabsTrigger>
-            <TabsTrigger value="patrimonio">Patrimônio</TabsTrigger>
-            <TabsTrigger value="prospere-vida">Prospere Vida</TabsTrigger>
-            <TabsTrigger value="simulacoes">Simulações</TabsTrigger>
-            <TabsTrigger value="plano-carreira">Plano de Carreira</TabsTrigger>
+        <Tabs 
+          value={activeTab} 
+          onValueChange={(value) => {
+            setActiveTab(value)
+            router.push(`/dashboard?tab=${value}`)
+          }} 
+          className="w-full"
+        >
+          <TabsList className="grid w-full grid-cols-4 md:grid-cols-8 bg-gray-800 gap-1 p-1">
+            <TabsTrigger 
+              value="dashboard"
+              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+            >
+              Dashboard
+            </TabsTrigger>
+            <TabsTrigger 
+              value="prospere-club"
+              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+            >
+              Prospere Club
+            </TabsTrigger>
+            <TabsTrigger 
+              value="cotas"
+              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+            >
+              Cotas
+            </TabsTrigger>
+            <TabsTrigger 
+              value="importacoes"
+              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+            >
+              Importações
+            </TabsTrigger>
+            <TabsTrigger 
+              value="patrimonio"
+              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+            >
+              Patrimônio
+            </TabsTrigger>
+            <TabsTrigger 
+              value="prospere-vida"
+              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+            >
+              Prospere Vida
+            </TabsTrigger>
+            <TabsTrigger 
+              value="simulacoes"
+              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+            >
+              Simulações
+            </TabsTrigger>
+            <TabsTrigger 
+              value="plano-carreira"
+              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+            >
+              Plano de Carreira
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="dashboard" className="mt-6">
             <DashboardTab />
