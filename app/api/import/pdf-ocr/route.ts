@@ -8,6 +8,7 @@ import { existsSync } from 'fs'
 import { parsePDFWithOCR, ParsedQuota } from '@/lib/services/pdfParserWithOCR'
 import { parsePDFEnhanced } from '@/lib/services/pdfParserEnhanced'
 import { parsePDFImproved } from '@/lib/services/pdfParserImproved'
+import { parsePDFRobust } from '@/lib/services/pdfParserRobust'
 import { parsePDF } from '@/lib/services/pdfParser'
 
 export const dynamic = 'force-dynamic'
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
     await writeFile(filepath, buffer)
 
     // Tentar parse melhorado (focado em valores brasileiros corretos)
-    console.log('🔄 Tentando parse melhorado do PDF (focado em valores BR)...')
+    console.log('🔄 Tentando parse melhorado do PDF com OCR...')
     let parseResult = await parsePDFImproved(buffer, true)
 
     // Se não encontrou cotas ou cotas incompletas, tentar outros métodos
@@ -81,6 +82,20 @@ export async function POST(request: NextRequest) {
         }
       } catch (enhancedError) {
         console.error('❌ Enhanced error:', enhancedError)
+      }
+
+      // Se ainda não encontrou, tentar parser robusto (extração agressiva)
+      if (parseResult.quotas.length === 0 || parseResult.quotas.some(q => !q.vlBem || !q.vlParcela)) {
+        console.log('⚠️ Tentando parser robusto (extração agressiva) como último recurso...')
+        try {
+          const robustResult = await parsePDFRobust(buffer)
+          if (robustResult.quotas.length > parseResult.quotas.length) {
+            parseResult = robustResult
+            console.log(`✅ Parser robusto encontrou ${parseResult.quotas.length} cotas`)
+          }
+        } catch (robustError) {
+          console.error('❌ Parser robusto falhou:', robustError)
+        }
       }
     } else {
       console.log(`✅ Parse melhorado encontrou ${parseResult.quotas.length} cotas`)

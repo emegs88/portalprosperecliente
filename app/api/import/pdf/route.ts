@@ -6,6 +6,7 @@ import { parsePDF } from '@/lib/services/pdfParser'
 import { parsePDFEnhanced } from '@/lib/services/pdfParserEnhanced'
 import { parsePDFImproved } from '@/lib/services/pdfParserImproved'
 import { parsePDFWithOCR } from '@/lib/services/pdfParserWithOCR'
+import { parsePDFRobust } from '@/lib/services/pdfParserRobust'
 import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
@@ -58,8 +59,22 @@ export async function POST(request: NextRequest) {
       if (enhancedResult.quotas.length > 0) {
         parseResult = enhancedResult
       }
+    }
+
+    // Se ainda não encontrou, tentar parser robusto (último recurso)
+    if (parseResult.quotas.length === 0 || parseResult.quotas.some(q => !q.vlBem || !q.vlParcela)) {
+      console.log('⚠️ Parse enhanced incompleto, tentando parser robusto (extração agressiva)...')
+      try {
+        const robustResult = await parsePDFRobust(buffer)
+        if (robustResult.quotas.length > parseResult.quotas.length) {
+          parseResult = robustResult
+          console.log(`✅ Parser robusto encontrou ${parseResult.quotas.length} cotas`)
+        }
+      } catch (robustError) {
+        console.error('❌ Parser robusto falhou:', robustError)
+      }
     } else {
-      console.log(`✅ Parse melhorado encontrou ${parseResult.quotas.length} cotas`)
+      console.log(`✅ Parse encontrou ${parseResult.quotas.length} cotas`)
     }
 
     if (parseResult.errors.length > 0 && parseResult.quotas.length === 0) {
