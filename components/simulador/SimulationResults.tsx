@@ -194,6 +194,35 @@ export function SimulationResults({
     valorVendas: s.valorVendas || 0,
   }))
 
+  // Extrair fluxo mensal de aportes para comparador CDI
+  const monthlyFlow = snapshots.map(s => s.valorParcelas || 0)
+
+  const handleShare = async () => {
+    try {
+      const response = await fetch(`/api/simulation/runs/${runId}/share`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        throw new Error('Erro ao gerar link')
+      }
+
+      const data = await response.json()
+      await navigator.clipboard.writeText(data.shareUrl)
+      
+      toast({
+        title: 'Link copiado!',
+        description: 'Compartilhe o link para visualização read-only',
+      })
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao gerar link',
+        description: error instanceof Error ? error.message : 'Tente novamente',
+      })
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header com seleção de execução */}
