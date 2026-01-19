@@ -214,7 +214,14 @@ function processTextAggressive(text: string): ParsedQuota[] {
     const context = lines.slice(index, Math.min(index + 4, lines.length)).join(' ')
     const quotaInfo = detectQuotaNumberFlexible(context)
     if (quotaInfo && quotaInfo.grupo && quotaInfo.cota) {
-      quotaMatches.push({ info: quotaInfo, lineIndex: index })
+      quotaMatches.push({ 
+        info: {
+          grupo: quotaInfo.grupo,
+          cota: quotaInfo.cota,
+          versao: quotaInfo.versao || '00',
+        }, 
+        lineIndex: index 
+      })
     }
   })
 
@@ -262,7 +269,7 @@ function processTextAggressive(text: string): ParsedQuota[] {
           const quota: ParsedQuota = {
             grupo: quotaInfo.grupo,
             cota: quotaInfo.cota,
-            versao: quotaInfo.versao,
+            versao: quotaInfo.versao || '00',
             dataVenda: '',
             situacaoCobranca: 'N00 - NORMAL',
             contemplacao: 'Não Contemplada',

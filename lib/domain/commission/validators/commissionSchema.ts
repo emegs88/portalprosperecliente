@@ -49,7 +49,7 @@ export const commissionRuleSchema = z.object({
   baseRate: z.number().min(0).max(100),
   splitRules: commissionSplitSchema,
   bonusRules: bonusRulesSchema.optional(),
-  overrideRules: z.record(z.any()).optional(),
+  overrideRules: z.record(z.string(), z.any()).optional(),
   validFrom: z.date(),
   validUntil: z.date().optional(),
   isActive: z.boolean(),
@@ -71,7 +71,7 @@ export const commissionEntrySchema = z.object({
   paidAt: z.date().optional(),
   payoutId: z.string().optional(),
   notes: z.string().optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
 })
 
 export const reconciliationRowSchema = z.object({

@@ -28,9 +28,9 @@ export const experienceSchema = z.object({
   category: z.string().optional(),
   tags: z.array(z.string()).optional(),
   status: experienceStatusSchema,
-  eligibilityRules: z.record(z.any()).optional(),
+  eligibilityRules: z.record(z.string(), z.any()).optional(),
   benefits: z.array(z.string()).optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
   clubLevelId: z.string().optional(),
 })
 
@@ -40,7 +40,7 @@ export const experienceDateSchema = z.object({
   date: z.date(),
   time: z.string().optional(),
   maxCapacity: z.number().int().positive(),
-  capacityByLevel: z.record(z.number().int().positive()).optional(),
+  capacityByLevel: z.record(z.string(), z.number().int().positive()).optional(),
   availableSlots: z.number().int().min(0),
   price: z.number().min(0),
   status: z.enum(['active', 'full', 'cancelled']),
@@ -61,7 +61,7 @@ export const reservationSchema = z.object({
   checkInAt: z.date().optional(),
   checkOutAt: z.date().optional(),
   notes: z.string().optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
 })
 
 export const guestSchema = z.object({
@@ -85,5 +85,5 @@ export const clubLevelSchema = z.object({
   icon: z.string().optional(),
   description: z.string().optional(),
   benefits: z.array(z.string()),
-  rules: z.record(z.any()).optional(),
+  rules: z.record(z.string(), z.any()).optional(),
 })

@@ -91,7 +91,7 @@ export const simulationEventSchema = z.object({
   valor: z.number().min(0),
   descricao: z.string(),
   destino: z.string().optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
 })
 
 export const comparacaoSchema = z.object({

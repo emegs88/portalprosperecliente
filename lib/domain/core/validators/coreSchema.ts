@@ -66,7 +66,7 @@ export const realSaleSchema = z.object({
   contemplationDate: z.date().optional(),
   commissionRate: z.number().min(0).max(100).optional(),
   notes: z.string().optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
 })
 
 export const timelineEventSchema = z.object({
@@ -80,7 +80,7 @@ export const timelineEventSchema = z.object({
   valor: z.number().optional(),
   quotaId: z.string().optional(),
   saleId: z.string().optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
 })
 
 export const monthlyTimelineSchema = z.object({

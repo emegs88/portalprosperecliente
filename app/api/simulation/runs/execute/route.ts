@@ -9,8 +9,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { simulatePatrimonioAccumulation } from '@/lib/domain/simulation/services/simulatorEngine'
+import { executeSimulation } from '@/lib/domain/simulation/services/simulatorAdapter'
 import { simulationParamsSchema } from '@/lib/domain/simulation/validators/simulationSchema'
+import { getIndicesForSimulation } from '@/lib/domain/simulation/services/getIndicesForSimulation'
 import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
@@ -24,9 +25,7 @@ const executeSchema = z.object({
 
 /**
  * POST /api/simulation/runs/execute
- * Executar uma simulação
- * 
- * TODO: Integrar com motor de simulação refatorado
+ * Executar uma simulação completa
  */
 export async function POST(request: NextRequest) {
   try {
@@ -55,8 +54,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // TODO: Executar simulação usando motor refatorado
-    // Por enquanto, criar run vazia (motor será integrado no próximo commit)
+    // Obter índices (CDI, INCC, Poupança)
+    const indices = await getIndicesForSimulation(validated.params.prazo)
+
+    // Executar simulação usando adapter
+    const result = await executeSimulation(
+      validated.params.quotas,
+      validated.params,
+      indices
+    )
+
+    // Criar run no banco
     const run = await prisma.simulationRun.create({
       data: {
         simulationId: validated.simulationId,
@@ -64,37 +72,78 @@ export async function POST(request: NextRequest) {
         params: JSON.stringify(validated.params),
         quotaIds: JSON.stringify(validated.params.quotas.map(q => q.id)),
         isSimulation: true,
-        // Valores iniciais (serão preenchidos pelo motor)
-        patrimonioFinal: 0,
-        totalPagoParcelas: 0,
-        totalPagoBolso: 0,
-        totalRecebidoVendas: 0,
-        caixaFinalInvestido: 0,
-        custoPatrimonio: 0,
-        roi: 0,
-        multiplicadorPatrimonial: 0,
-        custoPorReal: 0,
-        numContemplacoes: 0,
-        numVendas: 0,
-        cotasAtivasFinal: 0,
+        patrimonioFinal: result.patrimonioFinal,
+        totalPagoParcelas: result.totalPagoParcelas,
+        totalPagoBolso: result.totalPagoBolso,
+        totalRecebidoVendas: result.totalRecebidoVendas,
+        caixaFinalInvestido: result.caixaFinalInvestido,
+        custoPatrimonio: result.custoPatrimonio,
+        roi: result.roi,
+        multiplicadorPatrimonial: result.multiplicadorPatrimonial,
+        custoPorReal: result.custoPorReal,
+        numContemplacoes: result.numContemplacoes,
+        numVendas: result.numVendas,
+        cotasAtivasFinal: result.cotasAtivasFinal,
+        comparacaoCdi: result.comparacaoCdi ? JSON.stringify(result.comparacaoCdi) : null,
+        comparacaoPoupanca: result.comparacaoPoupanca ? JSON.stringify(result.comparacaoPoupanca) : null,
+        resumoTexto: result.resumoTexto,
       },
     })
 
-    // TODO: Executar simulação assíncrona
-    // Por enquanto, retornar run criada
-    // No próximo commit, vamos integrar o motor de simulação
+    // Salvar snapshots mensais em batch
+    if (result.snapshots.length > 0) {
+      await prisma.monthlySnapshot.createMany({
+        data: result.snapshots.map((snapshot) => ({
+          simulationRunId: run.id,
+          mes: snapshot.mes,
+          mesLabel: snapshot.mesLabel,
+          parcelasPagas: snapshot.parcelasPagas,
+          valorParcelas: snapshot.valorParcelas,
+          contemplacoes: snapshot.contemplacoes,
+          vendas: snapshot.vendas,
+          valorVendas: snapshot.valorVendas,
+          caixa: snapshot.caixa,
+          caixaInvestido: snapshot.caixaInvestido,
+          patrimonio: snapshot.patrimonio,
+          creditoAtualizado: snapshot.creditoAtualizado || 0,
+          totalPago: snapshot.totalPago,
+          totalPagoBolso: snapshot.totalPagoBolso,
+          cdiAcumulado: snapshot.cdiAcumulado,
+          poupancaAcumulado: snapshot.poupancaAcumulado,
+        })),
+      })
+    }
+
+    // Salvar events em batch
+    if (result.events.length > 0) {
+      await prisma.eventLog.createMany({
+        data: result.events.map((event) => ({
+          simulationRunId: run.id,
+          tipo: event.tipo,
+          mes: event.mes,
+          cotaId: event.cotaId,
+          cotaGrupo: event.cotaGrupo,
+          cotaNumero: event.cotaNumero,
+          valor: event.valor,
+          descricao: event.descricao,
+          destino: event.destino || null,
+          metadata: event.metadata ? JSON.stringify(event.metadata) : null,
+          isSimulation: true,
+        })),
+      })
+    }
 
     return NextResponse.json(
       {
         run,
-        message: 'Simulation run created. Motor integration pending.',
+        result,
       },
       { status: 201 }
     )
   } catch (error: any) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Validation error', details: error.errors },
+        { error: 'Validation error', details: error.issues },
         { status: 400 }
       )
     }
