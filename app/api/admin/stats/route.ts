@@ -96,14 +96,28 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    const commissionsStats = await prisma.commissionEntry.aggregate({
-      _sum: {
-        sellerValue: true,
-        leaderValue: true,
-        partnerValue: true,
-        totalValue: true,
+    // Buscar comissões e calcular por role
+    const allCommissions = await prisma.commissionEntry.findMany({
+      select: {
+        role: true,
+        total: true,
       },
     })
+
+    const commissionsStats = {
+      _sum: {
+        sellerValue: allCommissions
+          .filter(c => c.role === 'VENDEDOR' || c.role === 'SELLER')
+          .reduce((sum, c) => sum + (c.total || 0), 0),
+        leaderValue: allCommissions
+          .filter(c => c.role === 'LIDER' || c.role === 'LEADER')
+          .reduce((sum, c) => sum + (c.total || 0), 0),
+        partnerValue: allCommissions
+          .filter(c => c.role === 'PARCEIRO' || c.role === 'PARTNER')
+          .reduce((sum, c) => sum + (c.total || 0), 0),
+        totalValue: allCommissions.reduce((sum, c) => sum + (c.total || 0), 0),
+      },
+    }
 
     // Estatísticas de simulações
     const simulationStats = await prisma.simulationRun.aggregate({
