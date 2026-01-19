@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { checkEligibility } from '@/lib/services/clubService'
 import { generateQRCode } from '@/lib/services/qrService'
+import { sendEmail, getReservationConfirmationEmail } from '@/lib/services/emailService'
 import { v4 as uuidv4 } from 'uuid'
 
 export const dynamic = 'force-dynamic'
@@ -131,6 +132,9 @@ export async function POST(request: Request) {
         date: true,
         clubLevel: true,
         guests: true,
+        user: {
+          select: { name: true, email: true },
+        },
       },
     })
 
@@ -141,6 +145,48 @@ export async function POST(request: Request) {
         availableSlots: experienceDate.availableSlots - guestCount,
       },
     })
+
+    // Enviar email de confirmação (async, não bloqueia resposta)
+    const userEmail = reservation.user?.email || session.user.email
+    const userName = reservation.user?.name || session.user.name || 'Cliente'
+    
+    if (userEmail) {
+      try {
+        const emailTemplate = getReservationConfirmationEmail({
+          userName,
+          userEmail,
+          experienceTitle: reservation.experience.title,
+          experienceDate: reservation.date.date,
+          experienceTime: reservation.date.time || undefined,
+          location: reservation.experience.location || undefined,
+          address: reservation.experience.address || undefined,
+          guestCount: reservation.guestCount,
+          guests: reservation.guests.map(g => ({
+            name: g.name,
+            email: g.email || undefined,
+          })),
+          qrCode: reservation.qrCodeImage || undefined,
+          reservationId: reservation.id,
+          clubLevel: reservation.clubLevel.displayName,
+        })
+
+        const emailResult = await sendEmail({
+          to: userEmail,
+          subject: emailTemplate.subject,
+          html: emailTemplate.html,
+          text: emailTemplate.text,
+        })
+
+        if (emailResult.success) {
+          console.log(`✅ Email de confirmação enviado para ${userEmail}`)
+        } else {
+          console.warn(`⚠️ Erro ao enviar email: ${emailResult.error}`)
+        }
+      } catch (emailError: any) {
+        // Não falhar a criação da reserva se o email falhar
+        console.error('❌ Erro ao enviar email de confirmação:', emailError)
+      }
+    }
 
     return NextResponse.json(reservation, { status: 201 })
   } catch (error: any) {

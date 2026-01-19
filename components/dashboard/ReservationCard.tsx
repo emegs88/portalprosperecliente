@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Calendar, Clock, Users, QrCode, CheckCircle, XCircle, Loader } from 'lucide-react'
 import Image from 'next/image'
 import { formatCurrency } from '@/lib/utils'
+import { ReservationEmailButton } from './ReservationEmailButton'
 
 interface ReservationCardProps {
   reservation: {
@@ -76,8 +77,8 @@ export function ReservationCard({ reservation }: ReservationCardProps) {
           <Users className="w-4 h-4" />
           <span>{reservation.guestCount} convidado{reservation.guestCount !== 1 ? 's' : ''}</span>
         </div>
-        {reservation.qrCodeImage && reservation.status === 'confirmed' && (
-          <div className="pt-3 border-t border-gray-700">
+        <div className="pt-3 border-t border-gray-700 space-y-2">
+          {reservation.qrCodeImage && reservation.status === 'confirmed' && (
             <Button
               variant="outline"
               className="w-full"
@@ -89,8 +90,15 @@ export function ReservationCard({ reservation }: ReservationCardProps) {
               <QrCode className="w-4 h-4 mr-2" />
               Ver QR Code
             </Button>
-          </div>
-        )}
+          )}
+          {(reservation.status === 'pending' || reservation.status === 'confirmed') && (
+            <ReservationEmailButton
+              reservationId={reservation.id}
+              variant="outline"
+              size="sm"
+            />
+          )}
+        </div>
       </CardContent>
     </Card>
   )
