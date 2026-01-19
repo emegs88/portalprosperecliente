@@ -76,7 +76,7 @@ export function DashboardTab() {
   return (
     <div className="space-y-8">
       {/* Header com frase da marca */}
-      <div className="bg-gradient-to-r from-red-600/20 via-blue-600/20 to-indigo-600/20 border-l-4 border-red-500 rounded-lg p-6">
+      <div className="bg-gradient-to-r from-blue-600/20 via-blue-700/20 to-blue-800/20 border-l-4 border-blue-500 rounded-lg p-6">
         <h1 className="text-3xl font-bold text-white mb-2">
           Você não precisa de sorte. Precisa de estratégia.
         </h1>
@@ -85,7 +85,7 @@ export function DashboardTab() {
         </p>
       </div>
 
-      {/* Cards Principais - Estilo Prospere */}
+      {/* Cards Principais - Estilo Prospere Limpo */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-gradient-to-br from-blue-600/20 to-blue-800/20 border-blue-500/50 hover:border-blue-400 transition-all">
           <CardHeader className="pb-2">
@@ -104,10 +104,10 @@ export function DashboardTab() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-green-600/20 to-green-800/20 border-green-500/50 hover:border-green-400 transition-all">
+        <Card className="bg-gradient-to-br from-blue-600/20 to-blue-800/20 border-blue-500/50 hover:border-blue-400 transition-all">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-green-200 flex items-center gap-2">
-              <DollarSign className="w-5 h-5 text-green-400" />
+            <CardTitle className="text-sm font-medium text-blue-200 flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-blue-400" />
               Crédito Total
             </CardTitle>
           </CardHeader>
@@ -115,16 +115,16 @@ export function DashboardTab() {
             <div className="text-2xl font-bold text-white break-words">
               {formatCurrencyCompact(data.totalCredit || 0)}
             </div>
-            <p className="text-xs text-green-300/80 mt-1">
+            <p className="text-xs text-blue-300/80 mt-1">
               Valor total dos bens
             </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-purple-600/20 to-purple-800/20 border-purple-500/50 hover:border-purple-400 transition-all">
+        <Card className="bg-gradient-to-br from-blue-600/20 to-blue-800/20 border-blue-500/50 hover:border-blue-400 transition-all">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-purple-200 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-purple-400" />
+            <CardTitle className="text-sm font-medium text-blue-200 flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-blue-400" />
               Parcela Mensal
             </CardTitle>
           </CardHeader>
@@ -132,16 +132,16 @@ export function DashboardTab() {
             <div className="text-2xl font-bold text-white break-words">
               {formatCurrencyCompact(data.monthlyInstallment || 0)}
             </div>
-            <p className="text-xs text-purple-300/80 mt-1">
+            <p className="text-xs text-blue-300/80 mt-1">
               Aporte mensal total
             </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-yellow-600/20 to-orange-600/20 border-yellow-500/50 hover:border-yellow-400 transition-all">
+        <Card className="bg-gradient-to-br from-blue-600/20 to-blue-800/20 border-blue-500/50 hover:border-blue-400 transition-all">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-yellow-200 flex items-center gap-2">
-              <Award className="w-5 h-5 text-yellow-400" />
+            <CardTitle className="text-sm font-medium text-blue-200 flex items-center gap-2">
+              <Award className="w-5 h-5 text-blue-400" />
               Total a Receber
             </CardTitle>
           </CardHeader>
@@ -149,7 +149,7 @@ export function DashboardTab() {
             <div className="text-2xl font-bold text-white break-words">
               {formatCurrencyCompact(data.totalToReceive || 0)}
             </div>
-            <p className="text-xs text-yellow-300/80 mt-1">
+            <p className="text-xs text-blue-300/80 mt-1">
               Valor das cotas contempladas
             </p>
           </CardContent>
@@ -158,10 +158,10 @@ export function DashboardTab() {
 
       {/* Segunda Linha - Métricas de Estratégia */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-red-600/20 to-red-800/20 border-red-500/50 hover:border-red-400 transition-all">
+        <Card className="bg-gradient-to-br from-blue-600/20 to-blue-800/20 border-blue-500/50 hover:border-blue-400 transition-all">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-red-200 flex items-center gap-2">
-              <Target className="w-5 h-5 text-red-400" />
+            <CardTitle className="text-sm font-medium text-blue-200 flex items-center gap-2">
+              <Target className="w-5 h-5 text-blue-400" />
               Patrimônio Acumulado
             </CardTitle>
           </CardHeader>
@@ -169,24 +169,24 @@ export function DashboardTab() {
             <div className="text-2xl font-bold text-white break-words">
               {formatCurrencyCompact(data.patrimonioAcumulado || 0)}
             </div>
-            <p className="text-xs text-red-300/80 mt-1">
+            <p className="text-xs text-blue-300/80 mt-1">
               Valor acumulado atual
             </p>
           </CardContent>
         </Card>
 
-        <Card className={`bg-gradient-to-br ${ganhoPatrimonio >= 0 ? 'from-green-600/20 to-green-800/20 border-green-500/50' : 'from-red-600/20 to-red-800/20 border-red-500/50'} hover:opacity-90 transition-all`}>
+        <Card className={`bg-gradient-to-br ${ganhoPatrimonio >= 0 ? 'from-blue-600/20 to-blue-800/20 border-blue-500/50' : 'from-red-600/20 to-red-800/20 border-red-500/50'} hover:opacity-90 transition-all`}>
           <CardHeader className="pb-2">
-            <CardTitle className={`text-sm font-medium flex items-center gap-2 ${ganhoPatrimonio >= 0 ? 'text-green-200' : 'text-red-200'}`}>
-              <TrendingUp className={`w-5 h-5 ${ganhoPatrimonio >= 0 ? 'text-green-400' : 'text-red-400'}`} />
+            <CardTitle className={`text-sm font-medium flex items-center gap-2 ${ganhoPatrimonio >= 0 ? 'text-blue-200' : 'text-red-200'}`}>
+              <TrendingUp className={`w-5 h-5 ${ganhoPatrimonio >= 0 ? 'text-blue-400' : 'text-red-400'}`} />
               Ganho de Patrimônio
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold break-words ${ganhoPatrimonio >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            <div className={`text-2xl font-bold break-words ${ganhoPatrimonio >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
               {formatCurrencyCompact(ganhoPatrimonio)}
             </div>
-            <p className={`text-xs mt-1 ${ganhoPatrimonio >= 0 ? 'text-green-300/80' : 'text-red-300/80'}`}>
+            <p className={`text-xs mt-1 ${ganhoPatrimonio >= 0 ? 'text-blue-300/80' : 'text-red-300/80'}`}>
               Diferença vs total pago
             </p>
           </CardContent>
@@ -209,10 +209,10 @@ export function DashboardTab() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-gray-700/20 to-gray-800/20 border-gray-600/50 hover:border-gray-500 transition-all">
+        <Card className="bg-gradient-to-br from-blue-600/20 to-blue-800/20 border-blue-500/50 hover:border-blue-400 transition-all">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-300 flex items-center gap-2">
-              <Percent className="w-5 h-5 text-gray-400" />
+            <CardTitle className="text-sm font-medium text-blue-200 flex items-center gap-2">
+              <Percent className="w-5 h-5 text-blue-400" />
               % Médio Pago
             </CardTitle>
           </CardHeader>
@@ -220,7 +220,7 @@ export function DashboardTab() {
             <div className="text-2xl font-bold text-white">
               {formatPercent(data.totalPercentPago || 0)}
             </div>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-blue-300/80 mt-1">
               Percentual médio pago
             </p>
           </CardContent>
@@ -229,7 +229,7 @@ export function DashboardTab() {
 
       {/* Seção: Pilares da Estratégia */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-red-600/10 to-red-800/10 border-red-500/30">
+        <Card className="bg-gradient-to-br from-blue-600/10 to-blue-800/10 border-blue-500/30 hover:border-blue-400/50 transition-all">
           <CardHeader>
             <CardTitle className="text-white text-lg font-bold">Sem juros</CardTitle>
           </CardHeader>
@@ -240,7 +240,7 @@ export function DashboardTab() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-blue-600/10 to-blue-800/10 border-blue-500/30">
+        <Card className="bg-gradient-to-br from-blue-600/10 to-blue-800/10 border-blue-500/30 hover:border-blue-400/50 transition-all">
           <CardHeader>
             <CardTitle className="text-white text-lg font-bold">Planejamento inteligente</CardTitle>
           </CardHeader>
@@ -251,7 +251,7 @@ export function DashboardTab() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-green-600/10 to-green-800/10 border-green-500/30">
+        <Card className="bg-gradient-to-br from-blue-600/10 to-blue-800/10 border-blue-500/30 hover:border-blue-400/50 transition-all">
           <CardHeader>
             <CardTitle className="text-white text-lg font-bold">Cartas contempladas</CardTitle>
           </CardHeader>
@@ -262,7 +262,7 @@ export function DashboardTab() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-purple-600/10 to-purple-800/10 border-purple-500/30">
+        <Card className="bg-gradient-to-br from-blue-600/10 to-blue-800/10 border-blue-500/30 hover:border-blue-400/50 transition-all">
           <CardHeader>
             <CardTitle className="text-white text-lg font-bold">Investimento patrimonial</CardTitle>
           </CardHeader>
@@ -277,7 +277,7 @@ export function DashboardTab() {
       {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Gráfico de Pizza: Distribuição de Cotas */}
-        <Card className="bg-black/50 border-red-600/20">
+        <Card className="bg-black/50 border-blue-600/30">
           <CardHeader>
             <CardTitle className="text-white text-lg">Distribuição de Cotas</CardTitle>
             <p className="text-sm text-gray-400">
@@ -321,7 +321,7 @@ export function DashboardTab() {
         </Card>
 
         {/* Gráfico de Barras: Resumo Financeiro */}
-        <Card className="bg-black/50 border-red-600/20">
+        <Card className="bg-black/50 border-blue-600/30">
           <CardHeader>
             <CardTitle className="text-white text-lg">Resumo Financeiro</CardTitle>
             <p className="text-sm text-gray-400">
