@@ -15,6 +15,7 @@ import { SimulationConfigWizard } from '@/components/simulador/SimulationConfigW
 import { SimulationResults } from '@/components/simulador/SimulationResults'
 import { SimulationHistory } from '@/components/simulador/SimulationHistory'
 import { useToast } from '@/components/ui/use-toast'
+import { useSimulationNotifications } from '@/lib/hooks/useSimulationNotifications'
 import { Loader2, History } from 'lucide-react'
 
 interface SimulationProject {
@@ -47,6 +48,9 @@ export default function SimulationDetailPage() {
   const [executing, setExecuting] = useState(false)
 
   const simulationId = params?.id as string
+
+  // Hook de notificações
+  useSimulationNotifications()
 
   useEffect(() => {
     if (session?.user?.id && simulationId) {
