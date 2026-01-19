@@ -77,28 +77,30 @@ export function ReservationCard({ reservation }: ReservationCardProps) {
           <Users className="w-4 h-4" />
           <span>{reservation.guestCount} convidado{reservation.guestCount !== 1 ? 's' : ''}</span>
         </div>
-        <div className="pt-3 border-t border-gray-700 space-y-2">
-          {reservation.qrCodeImage && reservation.status === 'confirmed' && (
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-                // Abrir modal com QR Code
-                window.open(reservation.qrCodeImage, '_blank')
-              }}
-            >
-              <QrCode className="w-4 h-4 mr-2" />
-              Ver QR Code
-            </Button>
-          )}
-          {(reservation.status === 'pending' || reservation.status === 'confirmed') && (
-            <ReservationEmailButton
-              reservationId={reservation.id}
-              variant="outline"
-              size="sm"
-            />
-          )}
-        </div>
+        {(reservation.qrCodeImage || reservation.status === 'pending' || reservation.status === 'confirmed') && (
+          <div className="pt-3 border-t border-gray-700 space-y-2">
+            {reservation.qrCodeImage && reservation.status === 'confirmed' && (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  // Abrir modal com QR Code
+                  window.open(reservation.qrCodeImage, '_blank')
+                }}
+              >
+                <QrCode className="w-4 h-4 mr-2" />
+                Ver QR Code
+              </Button>
+            )}
+            {(reservation.status === 'pending' || reservation.status === 'confirmed') && (
+              <ReservationEmailButton
+                reservationId={reservation.id}
+                variant="outline"
+                size="sm"
+              />
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   )
