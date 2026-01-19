@@ -81,15 +81,42 @@ export function SimulationResults({
       toast({
         title: 'Gerando PDF...',
       })
-      // TODO: Implementar exportação PDF
+      
+      // Importar dinamicamente para evitar problemas de SSR
+      const { generateSimulationPDF } = await import('@/lib/services/pdfExporter')
+      
+      const projectResponse = await fetch(`/api/simulation/projects/${projectId}`)
+      if (!projectResponse.ok) throw new Error('Erro ao carregar projeto')
+      const projectData = await projectResponse.json()
+      
+      const pdfBlob = await generateSimulationPDF(
+        {
+          name: projectData.project.name,
+          simulatorType: projectData.project.simulatorType,
+          description: projectData.project.description,
+        },
+        runData,
+        snapshots,
+        events
+      )
+      
+      const url = URL.createObjectURL(pdfBlob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `simulacao_${runId}_${new Date().toISOString().split('T')[0]}.pdf`
+      link.click()
+      URL.revokeObjectURL(url)
+      
       toast({
         title: 'PDF gerado!',
         description: 'Download iniciado',
       })
     } catch (error) {
+      console.error('Erro ao exportar PDF:', error)
       toast({
         variant: 'destructive',
         title: 'Erro ao exportar PDF',
+        description: error instanceof Error ? error.message : 'Tente novamente',
       })
     }
   }
