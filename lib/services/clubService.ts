@@ -195,6 +195,10 @@ export async function getAvailableExperiences(userId: string) {
     },
     include: {
       clubLevel: true,
+      dates: {
+        where: { status: 'active' },
+        orderBy: { date: 'asc' },
+      },
       _count: {
         select: { reservations: true },
       },
