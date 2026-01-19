@@ -434,16 +434,17 @@ model ImportTotals {
 // ⚠️ Este módulo é 100% isolado dos dados reais
 
 model Simulation {
-  id           String   @id @default(cuid())
-  userId       String
-  name         String   @default("Simulação Sem Nome")
-  description  String?
-  isFavorite   Boolean  @default(false)
-  isTemplate   Boolean  @default(false)
-  params       String // JSON SimulationParams
-  isSimulation Boolean  @default(true) // Flag de segurança
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String   @id @default(cuid())
+  userId        String
+  name          String   @default("Simulação Sem Nome")
+  description   String?
+  simulatorType String   @default("ACUMULO") // IMOVEIS | VEICULOS | FROTA | LANCE | ACUMULO | SORTEIO
+  isFavorite    Boolean  @default(false)
+  isTemplate    Boolean  @default(false)
+  params        String // JSON SimulationParams
+  isSimulation  Boolean  @default(true) // Flag de segurança
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   // ✅ PERMITIDO: FK apenas para User (autenticação)
   user User            @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -453,6 +454,7 @@ model Simulation {
 
   @@index([userId])
   @@index([userId, isFavorite])
+  @@index([userId, simulatorType])
   @@index([isSimulation])
   @@map("simulation_projects") // Renomeado para deixar explícito
 }
@@ -462,7 +464,7 @@ model SimulationRun {
   simulationId             String
   name                     String?
   executedAt               DateTime @default(now())
-  params                   String // JSON SimulationParams
+  params                   String // JSON SimulationParams (snapshot do usado)
   quotaIds                 String // JSON string[] - APENAS IDs como string, NÃO FK
   patrimonioFinal          Float    @default(0)
   totalPagoParcelas        Float    @default(0)
@@ -529,24 +531,26 @@ model EventLog {
   simulationRunId String
   tipo            String // PAGAMENTO | CONTEMPLACAO | VENDA | APLICACAO | REINVESTIMENTO
   mes             Int
-  cotaId          String? // APENAS string (referência), NÃO FK
-  cotaGrupo       String? // Referência por string
-  cotaNumero      String? // Referência por string
+  cotaId          String? // APENAS string (referência simulada), NÃO FK para Quota real
+  cotaGrupo       String? // Referência por string (simulada)
+  cotaNumero      String? // Referência por string (simulada)
   valor           Float    @default(0)
   descricao       String
   destino         String?
   metadata        String? // JSON
+  isSimulation    Boolean  @default(true) // Flag de segurança
   createdAt       DateTime @default(now())
 
   // ✅ PERMITIDO: FK apenas para SimulationRun (domínio próprio)
   simulationRun SimulationRun @relation(fields: [simulationRunId], references: [id], onDelete: Cascade)
 
   // ❌ PROIBIDO: NUNCA FK para Quota, Sale, ClientProfile, CommissionEntry, etc.
-  // ❌ cotaId é apenas string de referência, NÃO FK
+  // ❌ cotaId é apenas string de referência simulada, NÃO FK para tabela real
 
   @@index([simulationRunId])
   @@index([simulationRunId, mes])
   @@index([simulationRunId, tipo])
+  @@index([isSimulation])
   @@map("simulation_events") // Renomeado para deixar explícito
 }
 
