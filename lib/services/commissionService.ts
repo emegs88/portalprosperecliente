@@ -164,3 +164,102 @@ export function calculateMetaBonuses(totalCreditBRL: number): number {
 
   return totalBonus
 }
+
+/**
+ * Calcular e salvar comissões para uma venda
+ */
+export async function calculateCommission(saleId: string) {
+  const { prisma } = await import('@/lib/prisma')
+  
+  const sale = await prisma.sale.findUnique({
+    where: { id: saleId },
+    include: {
+      seller: {
+        include: {
+          sellerProfile: true,
+        },
+      },
+      partner: true,
+    },
+  })
+
+  if (!sale) {
+    throw new Error('Venda não encontrada')
+  }
+
+  // Buscar perfil do vendedor
+  const sellerProfile = sale.seller.sellerProfile
+  if (!sellerProfile) {
+    throw new Error('Perfil do vendedor não encontrado')
+  }
+
+  // Determinar nível do vendedor (assumindo que está no perfil ou no sistema)
+  const levelId = 'consultor' // TODO: Buscar do perfil do vendedor
+  
+  // Verificar se tem parceiro
+  const hasPartner = !!sale.partnerId
+  
+  // Verificar se tem líder
+  const hasLeader = !!sellerProfile.leaderId
+
+  // Calcular comissão
+  const commissionResult = calculateCommission({
+    creditBRL: sale.creditAmount,
+    productId: sale.productType,
+    levelId,
+    hasPartner,
+    hasLeader,
+  })
+
+  // Criar entradas de comissão
+  const entries = []
+
+  // Comissão do vendedor
+  entries.push({
+    saleId,
+    userId: sale.sellerId,
+    role: 'seller',
+    baseAmount: sale.creditAmount,
+    rate: commissionResult.breakdown.baseCommission / sale.creditAmount * 100,
+    amount: commissionResult.sellerCommission,
+    bonus: commissionResult.bonus || 0,
+    total: commissionResult.sellerCommission + (commissionResult.bonus || 0),
+    status: 'pending',
+  })
+
+  // Comissão do líder (se houver)
+  if (hasLeader && sellerProfile.leaderId) {
+    entries.push({
+      saleId,
+      userId: sellerProfile.leaderId,
+      role: 'leader',
+      baseAmount: sale.creditAmount,
+      rate: 0,
+      amount: commissionResult.leaderCommission,
+      override: commissionResult.override || 0,
+      total: commissionResult.leaderCommission + (commissionResult.override || 0),
+      status: 'pending',
+    })
+  }
+
+  // Comissão do parceiro (se houver)
+  if (hasPartner && sale.partnerId) {
+    entries.push({
+      saleId,
+      userId: sale.partnerId,
+      role: 'partner',
+      baseAmount: sale.creditAmount,
+      rate: 0,
+      amount: commissionResult.partnerCommission,
+      total: commissionResult.partnerCommission,
+      status: 'pending',
+    })
+  }
+
+  // Salvar entradas no banco
+  await prisma.commissionEntry.createMany({
+    data: entries,
+  })
+
+  return commissionResult
+}
