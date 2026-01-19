@@ -62,7 +62,7 @@ function extractAllMonetaryValues(text: string): number[] {
           .replace(/\./g, '')
           .replace(',', '.')
         const num = parseFloat(cleaned)
-        if (!isNaN(num) && num > 0 && num < 100000000) { // Limite razoável
+        if (!isNaN(num) && num > 0 && num < 1000000000) { // Até 1 bilhão (suporta 12.500.000,00)
           values.push(num)
         }
       })
