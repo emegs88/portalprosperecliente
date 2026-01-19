@@ -43,7 +43,7 @@ async function main() {
       const userUpdated = await prisma.user.findUnique({
         where: { email },
       })
-      if (userUpdated) {
+      if (userUpdated && userUpdated.passwordHash) {
         const isValid2 = await bcrypt.compare(testPassword, userUpdated.passwordHash)
         console.log('🔑 Teste após atualização:', isValid2 ? '✅ CORRETO' : '❌ INCORRETO')
       }
