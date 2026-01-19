@@ -47,6 +47,7 @@ interface Quota {
 }
 
 export function SimulacoesTab() {
+  const { toast } = useToast()
   const [quotas, setQuotas] = useState<Quota[]>([])
   const [selectedQuotas, setSelectedQuotas] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
@@ -142,60 +143,70 @@ export function SimulacoesTab() {
     try {
       setCalculating(true)
       const selectedQuotasData = quotas.filter(q => selectedQuotas.has(q.id))
-    const totalCotas = selectedQuotasData.length
-    const vlParcelaTotal = selectedQuotasData.reduce((sum, q) => sum + q.vlParcela, 0)
-    const vlBemTotal = selectedQuotasData.reduce((sum, q) => sum + q.vlBem, 0)
-    const vlParcelaBase = vlParcelaTotal / totalCotas || 0
-    const vlBem = vlBemTotal / totalCotas || 0
+      const totalCotas = selectedQuotasData.length
+      const vlParcelaTotal = selectedQuotasData.reduce((sum, q) => sum + q.vlParcela, 0)
+      const vlBemTotal = selectedQuotasData.reduce((sum, q) => sum + q.vlBem, 0)
+      const vlParcelaBase = vlParcelaTotal / totalCotas || 0
+      const vlBem = vlBemTotal / totalCotas || 0
 
-    // Calcular parcelas com INCC
-    let totalPagoParcelas = 0
-    const parcelasMensais: number[] = []
-    
-    for (let mes = 1; mes <= params.mesesSimulacao; mes++) {
-      const vlParcelaMes = vlParcelaBase * Math.pow(1 + params.taxaIncc / 100, mes - 1)
-      parcelasMensais.push(vlParcelaMes * totalCotas)
-      totalPagoParcelas += vlParcelaMes * totalCotas
+      // Calcular parcelas com INCC
+      let totalPagoParcelas = 0
+      const parcelasMensais: number[] = []
+      
+      for (let mes = 1; mes <= params.mesesSimulacao; mes++) {
+        const vlParcelaMes = vlParcelaBase * Math.pow(1 + params.taxaIncc / 100, mes - 1)
+        parcelasMensais.push(vlParcelaMes * totalCotas)
+        totalPagoParcelas += vlParcelaMes * totalCotas
+      }
+
+      // Calcular venda de cota contemplada
+      const valorVenda = vlBem * (params.percentVendaContemplada / 100) * totalCotas
+      const taxaIntermediacaoValor = valorVenda * (params.taxaIntermediacao / 100)
+      const valorLiquidoRecebido = valorVenda - taxaIntermediacaoValor
+
+      // Aplicar CDI se ativado
+      let valorFinal = valorLiquidoRecebido
+      if (params.aplicarCdi) {
+        valorFinal = valorLiquidoRecebido * Math.pow(1 + params.taxaCdi / 100, params.mesesSimulacao)
+      }
+
+      // Calcular lucro
+      const lucroLiquido = valorFinal - totalPagoParcelas
+      const ganhoCapital = lucroLiquido
+      const roi = totalPagoParcelas > 0 ? (lucroLiquido / totalPagoParcelas) * 100 : 0
+
+      // Dados para gráficos
+      const dadosEvolucao = parcelasMensais.map((parcela, index) => ({
+        mes: index + 1,
+        mesLabel: `Mês ${index + 1}`,
+        totalPago: parcelasMensais.slice(0, index + 1).reduce((a, b) => a + b, 0),
+        valorRecebido: index === params.mesesSimulacao - 1 ? valorFinal : 0,
+      }))
+
+      setResults({
+        totalPagoParcelas,
+        valorVenda,
+        taxaIntermediacaoValor,
+        valorLiquidoRecebido,
+        valorFinal,
+        lucroLiquido,
+        ganhoCapital,
+        roi,
+        parcelasPagas: params.mesesSimulacao,
+        dadosEvolucao,
+        totalCotas,
+      })
+    } catch (error: any) {
+      console.error('Error calculating simulation:', error)
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao calcular simulação',
+        description: error.message || 'Não foi possível calcular a simulação.',
+      })
+    } finally {
+      setCalculating(false)
     }
-
-    // Calcular venda de cota contemplada
-    const valorVenda = vlBem * (params.percentVendaContemplada / 100) * totalCotas
-    const taxaIntermediacaoValor = valorVenda * (params.taxaIntermediacao / 100)
-    const valorLiquidoRecebido = valorVenda - taxaIntermediacaoValor
-
-    // Aplicar CDI se ativado
-    let valorFinal = valorLiquidoRecebido
-    if (params.aplicarCdi) {
-      valorFinal = valorLiquidoRecebido * Math.pow(1 + params.taxaCdi / 100, params.mesesSimulacao)
-    }
-
-    // Calcular lucro
-    const lucroLiquido = valorFinal - totalPagoParcelas
-    const ganhoCapital = lucroLiquido
-    const roi = totalPagoParcelas > 0 ? (lucroLiquido / totalPagoParcelas) * 100 : 0
-
-    // Dados para gráficos
-    const dadosEvolucao = parcelasMensais.map((parcela, index) => ({
-      mes: index + 1,
-      mesLabel: `Mês ${index + 1}`,
-      totalPago: parcelasMensais.slice(0, index + 1).reduce((a, b) => a + b, 0),
-      valorRecebido: index === params.mesesSimulacao - 1 ? valorFinal : 0,
-    }))
-
-    setResults({
-      totalPagoParcelas,
-      valorVenda,
-      taxaIntermediacaoValor,
-      valorLiquidoRecebido,
-      valorFinal,
-      lucroLiquido,
-      ganhoCapital,
-      roi,
-      parcelasPagas: params.mesesSimulacao,
-      dadosEvolucao,
-      totalCotas,
-    })
-  }
+  }, [quotas, selectedQuotas, params, toast])
 
   if (loading) {
     return (
