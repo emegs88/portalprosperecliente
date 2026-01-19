@@ -7,6 +7,7 @@ import { join } from 'path'
 import { existsSync } from 'fs'
 import { parsePDFWithOCR, ParsedQuota } from '@/lib/services/pdfParserWithOCR'
 import { parsePDFEnhanced } from '@/lib/services/pdfParserEnhanced'
+import { parsePDFImproved } from '@/lib/services/pdfParserImproved'
 import { parsePDF } from '@/lib/services/pdfParser'
 
 export const dynamic = 'force-dynamic'
@@ -46,64 +47,46 @@ export async function POST(request: NextRequest) {
 
     await writeFile(filepath, buffer)
 
-    // Tentar parse melhorado primeiro
-    console.log('🔄 Tentando parse melhorado do PDF...')
-    let parseResult = await parsePDFEnhanced(buffer, true)
+    // Tentar parse melhorado (focado em valores brasileiros corretos)
+    console.log('🔄 Tentando parse melhorado do PDF (focado em valores BR)...')
+    let parseResult = await parsePDFImproved(buffer, true)
 
-    // Se não encontrou cotas, tentar métodos alternativos
-    if (parseResult.quotas.length === 0) {
-      console.log('⚠️ Parse melhorado não encontrou cotas, tentando métodos alternativos...')
+    // Se não encontrou cotas ou cotas incompletas, tentar outros métodos
+    if (parseResult.quotas.length === 0 || parseResult.quotas.some(q => !q.vlBem || !q.vlParcela)) {
+      console.log('⚠️ Parse melhorado incompleto, tentando métodos alternativos...')
       
       try {
-        // Tentar método OCR
-        parseResult = await parsePDFWithOCR(buffer, true)
-      } catch (ocrError) {
-        console.error('❌ OCR error:', ocrError)
-        
-        // Tentar parse normal como último recurso
-        try {
-          const normalResult = await parsePDF(buffer)
-          if (normalResult.quotas.length > 0) {
-            parseResult = normalResult
-          }
-        } catch (normalError) {
-          console.error('❌ Parse normal error:', normalError)
+        // Tentar método enhanced
+        const enhancedResult = await parsePDFEnhanced(buffer, true)
+        if (enhancedResult.quotas.length > parseResult.quotas.length) {
+          parseResult = enhancedResult
+        } else if (parseResult.quotas.length > 0) {
+          // Mesclar para completar dados faltantes
+          const quotaMap = new Map<string, ParsedQuota>()
+          parseResult.quotas.forEach(q => {
+            const key = `${q.grupo}-${q.cota}`
+            quotaMap.set(key, q)
+          })
+          enhancedResult.quotas.forEach(q => {
+            const key = `${q.grupo}-${q.cota}`
+            const existing = quotaMap.get(key)
+            if (existing) {
+              if (!existing.vlBem && q.vlBem) existing.vlBem = q.vlBem
+              if (!existing.vlParcela && q.vlParcela) existing.vlParcela = q.vlParcela
+            } else {
+              quotaMap.set(key, q)
+            }
+          })
+          parseResult.quotas = Array.from(quotaMap.values())
         }
+      } catch (enhancedError) {
+        console.error('❌ Enhanced error:', enhancedError)
       }
     } else {
       console.log(`✅ Parse melhorado encontrou ${parseResult.quotas.length} cotas`)
-      
-      // Validar se estão completas
-      const incompleteQuotas = parseResult.quotas.filter(q => !q.vlBem || !q.vlParcela)
-      if (incompleteQuotas.length > 0) {
-        console.log(`⚠️ ${incompleteQuotas.length} cotas incompletas, tentando completar com OCR...`)
-        try {
-          const ocrResult = await parsePDFWithOCR(buffer, true)
-          if (ocrResult.quotas.length > 0) {
-            // Mesclar resultados
-            const quotaMap = new Map<string, ParsedQuota>()
-            parseResult.quotas.forEach(q => {
-              const key = `${q.grupo}-${q.cota}`
-              quotaMap.set(key, q)
-            })
-            ocrResult.quotas.forEach(q => {
-              const key = `${q.grupo}-${q.cota}`
-              const existing = quotaMap.get(key)
-              if (existing) {
-                // Completar dados faltantes
-                if (!existing.vlBem && q.vlBem) existing.vlBem = q.vlBem
-                if (!existing.vlParcela && q.vlParcela) existing.vlParcela = q.vlParcela
-                if (!existing.vlReceber && q.vlReceber) existing.vlReceber = q.vlReceber
-                if (!existing.percentPago && q.percentPago) existing.percentPago = q.percentPago
-              } else {
-                quotaMap.set(key, q)
-              }
-            })
-            parseResult.quotas = Array.from(quotaMap.values())
-          }
-        } catch (mergeError) {
-          console.error('❌ Merge error:', mergeError)
-        }
+      if (parseResult.quotas.length > 0) {
+        const sample = parseResult.quotas[0]
+        console.log(`📊 Exemplo extraído: vlBem=${sample.vlBem}, vlParcela=${sample.vlParcela}`)
       }
     }
 
