@@ -278,23 +278,35 @@ export async function parsePDFWithOCR(buffer: Buffer, useOCR: boolean = false): 
 
     if (useOCR) {
       // Usar OCR real com Tesseract.js
-      // Nota: Para usar OCR completo, seria necessário converter PDF para imagem primeiro
-      // Por enquanto, tentamos extrair texto diretamente
+      // Nota: Tesseract funciona melhor com imagens, então primeiro extraímos o texto do PDF
+      // e depois tentamos OCR apenas se necessário
       try {
-        const worker = await createWorker('por') // Português
-        const { data: { text } } = await worker.recognize(buffer as any)
-        await worker.terminate()
-        extractedText = text
-      } catch (ocrError) {
-        console.warn('OCR direto falhou, tentando pdf-parse:', ocrError)
-        // Fallback para pdf-parse
+        // Primeiro tentar extrair texto diretamente do PDF
         const pdfData = await pdfParse(buffer)
         extractedText = pdfData.text
+
+        // Se o texto extraído está vazio ou muito curto, pode ser um PDF escaneado
+        // Nesse caso, seria necessário converter PDF para imagem primeiro
+        // Por enquanto, usamos o texto extraído e melhoramos o parsing
+        if (!extractedText || extractedText.trim().length < 100) {
+          console.warn('Texto extraído está vazio, PDF pode ser escaneado')
+          // TODO: Implementar conversão PDF -> imagem -> OCR completo
+        }
+      } catch (pdfError) {
+        console.warn('Erro ao extrair texto do PDF:', pdfError)
+        result.errors.push('Erro ao extrair texto do PDF. Verifique se o arquivo está válido.')
+        return result
       }
     } else {
       // Extrair texto normalmente
-      const pdfData = await pdfParse(buffer)
-      extractedText = pdfData.text
+      try {
+        const pdfData = await pdfParse(buffer)
+        extractedText = pdfData.text
+      } catch (pdfError) {
+        console.error('Erro ao parsear PDF:', pdfError)
+        result.errors.push('Erro ao processar PDF. Verifique se o arquivo está válido.')
+        return result
+      }
     }
 
     if (!extractedText || extractedText.trim().length < 50) {

@@ -45,12 +45,25 @@ export async function POST(request: NextRequest) {
 
     await writeFile(filepath, buffer)
 
-    // Parse PDF
-    const parseResult = await parsePDF(buffer)
+    // Parse PDF (tentar método melhorado primeiro)
+    let parseResult = await parsePDF(buffer)
+
+    // Se não encontrou cotas ou cotas incompletas, tentar método melhorado
+    if (parseResult.quotas.length === 0 || parseResult.quotas.some(q => !q.vlBem || !q.vlParcela)) {
+      try {
+        const improvedResult = await parsePDFWithOCR(buffer, false)
+        if (improvedResult.quotas.length > parseResult.quotas.length || 
+            improvedResult.quotas.some(q => q.vlBem && q.vlParcela)) {
+          parseResult = improvedResult
+        }
+      } catch (improveError) {
+        console.warn('Método melhorado falhou, usando resultado original:', improveError)
+      }
+    }
 
     if (parseResult.errors.length > 0 && parseResult.quotas.length === 0) {
       return NextResponse.json(
-        { error: parseResult.errors.join(', ') },
+        { error: parseResult.errors.join(', ') || 'Nenhuma cota encontrada no PDF. Tente usar OCR para PDFs escaneados.' },
         { status: 400 }
       )
     }
