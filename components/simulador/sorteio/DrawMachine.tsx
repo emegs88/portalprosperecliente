@@ -95,15 +95,7 @@ export function DrawMachine({ onComplete, count, min, max }: DrawMachineProps) {
                   
                   {/* Números girando */}
                   {isDrawing && (
-                    <motion.div
-                      className="absolute inset-0 rounded-full"
-                      animate={{ rotate: 360 }}
-                      transition={{
-                        duration: 2,
-                        repeat: Infinity,
-                        ease: 'linear'
-                      }}
-                    >
+                    <div className="absolute inset-0 rounded-full animate-spin-slow">
                       {Array.from({ length: 20 }, (_, i) => (
                         <div
                           key={i}
@@ -117,7 +109,7 @@ export function DrawMachine({ onComplete, count, min, max }: DrawMachineProps) {
                           {Math.floor(Math.random() * 100).toString().padStart(2, '0')}
                         </div>
                       ))}
-                    </motion.div>
+                    </div>
                   )}
 
                   {/* Números sorteados revelados */}
