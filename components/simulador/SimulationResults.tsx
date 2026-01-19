@@ -21,8 +21,9 @@ import {
   ComposedChart,
 } from 'recharts'
 import { formatCurrency, formatPercent } from '@/lib/utils'
-import { Download, FileDown, TrendingUp, DollarSign, Target, Award, Loader2 } from 'lucide-react'
+import { Download, FileDown, TrendingUp, DollarSign, Target, Award, Loader2, Share2, Calculator } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
+import { CDIComparator } from './CDIComparator'
 
 interface SimulationResultsProps {
   runId: string
@@ -226,6 +227,10 @@ export function SimulationResults({
             <FileDown className="w-4 h-4 mr-2" />
             CSV
           </Button>
+          <Button variant="outline" onClick={handleShare}>
+            <Share2 className="w-4 h-4 mr-2" />
+            Compartilhar
+          </Button>
         </div>
       </div>
 
@@ -364,6 +369,27 @@ export function SimulationResults({
           </div>
         </CardContent>
       </Card>
+
+      {/* Comparador CDI/Poupança */}
+      {snapshots.length > 0 && (
+        <Card className="bg-[#0B1220] border-gray-700">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2">
+              <Calculator className="w-5 h-5" />
+              Comparação com CDI e Poupança
+            </CardTitle>
+            <CardDescription className="text-gray-400">
+              Compare o resultado da simulação com investimentos tradicionais usando o mesmo fluxo de aportes
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <CDIComparator
+              monthlyFlow={monthlyFlow}
+              months={snapshots.length}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Tabela de Eventos */}
       {events.length > 0 && (

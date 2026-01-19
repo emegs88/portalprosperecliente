@@ -13,8 +13,9 @@ import { ArrowLeft, Play, Download, FileDown, TrendingUp, Settings } from 'lucid
 import Link from 'next/link'
 import { SimulationConfigWizard } from '@/components/simulador/SimulationConfigWizard'
 import { SimulationResults } from '@/components/simulador/SimulationResults'
+import { SimulationHistory } from '@/components/simulador/SimulationHistory'
 import { useToast } from '@/components/ui/use-toast'
-import { Loader2 } from 'lucide-react'
+import { Loader2, History } from 'lucide-react'
 
 interface SimulationProject {
   id: string
@@ -224,6 +225,10 @@ export default function SimulationDetailPage() {
               <TrendingUp className="w-4 h-4 mr-2" />
               Resultados
             </TabsTrigger>
+            <TabsTrigger value="history" className="data-[state=active]:bg-blue-600">
+              <History className="w-4 h-4 mr-2" />
+              Histórico
+            </TabsTrigger>
           </TabsList>
 
           {/* Tab: Configuração */}
@@ -262,6 +267,11 @@ export default function SimulationDetailPage() {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          {/* Tab: Histórico */}
+          <TabsContent value="history">
+            <SimulationHistory projectId={simulationId} />
           </TabsContent>
         </Tabs>
       </div>
