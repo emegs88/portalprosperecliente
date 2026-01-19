@@ -16,7 +16,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { formatCurrency, formatPercent } from '@/lib/utils'
-import { Calendar, TrendingUp, Compare, Loader2 } from 'lucide-react'
+import { Calendar, TrendingUp, GitCompare, Loader2 } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
 
 interface SimulationRun {
@@ -234,7 +234,7 @@ export function SimulationHistory({ projectId }: SimulationHistoryProps) {
         <Card className="bg-[#0B1220] border-gray-700">
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2">
-              <Compare className="w-5 h-5" />
+              <GitCompare className="w-5 h-5" />
               Comparação de Execuções
             </CardTitle>
             <CardDescription className="text-gray-400">
