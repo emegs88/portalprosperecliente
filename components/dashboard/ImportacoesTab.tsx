@@ -87,10 +87,34 @@ export function ImportacoesTab() {
         body: formData,
       })
 
-      const data = await response.json()
-
+      // Verificar se a resposta é válida
       if (!response.ok) {
-        throw new Error(data.error || 'Erro ao importar arquivo')
+        let errorMessage = 'Erro ao importar arquivo'
+        try {
+          const errorData = await response.json()
+          errorMessage = errorData.error || errorData.message || errorMessage
+        } catch (jsonError) {
+          // Se não conseguiu parsear JSON, usar status text
+          errorMessage = response.statusText || `Erro ${response.status}`
+        }
+        throw new Error(errorMessage)
+      }
+
+      // Tentar parsear JSON
+      let data
+      try {
+        const text = await response.text()
+        if (!text || text.trim().length === 0) {
+          throw new Error('Resposta vazia do servidor')
+        }
+        data = JSON.parse(text)
+      } catch (jsonError) {
+        console.error('❌ Erro ao parsear JSON da resposta:', jsonError)
+        throw new Error('Erro ao processar resposta do servidor. Tente novamente.')
+      }
+
+      if (!data || typeof data !== 'object') {
+        throw new Error('Resposta inválida do servidor')
       }
 
       setSuccess(`✅ ${data.quotasCount} cotas importadas com sucesso!`)

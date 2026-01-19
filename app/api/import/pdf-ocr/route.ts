@@ -176,10 +176,32 @@ export async function POST(request: NextRequest) {
       quotasCount: parseResult.quotas.length,
       errors: parseResult.errors,
     })
-  } catch (error) {
-    console.error('Import PDF OCR error:', error)
+  } catch (error: any) {
+    console.error('❌ Import PDF OCR error:', error)
+    
+    // Garantir que sempre retorna JSON válido
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : typeof error === 'string' 
+        ? error 
+        : 'Erro desconhecido ao importar PDF com OCR'
+    
+    // Se o erro parece ser de parsing JSON, informar melhor
+    if (errorMessage.includes('JSON') || errorMessage.includes('Unexpected')) {
+      return NextResponse.json(
+        { 
+          error: 'Erro ao processar o arquivo PDF com OCR. O arquivo pode estar corrompido ou em formato não suportado.',
+          details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+        },
+        { status: 400 }
+      )
+    }
+    
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Erro ao importar PDF com OCR' },
+      { 
+        error: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      },
       { status: 500 }
     )
   }

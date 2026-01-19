@@ -415,19 +415,38 @@ export async function parsePDFImproved(buffer: Buffer, useOCR: boolean = false):
   }
 
   try {
+    // Validar buffer
+    if (!buffer || buffer.length === 0) {
+      result.errors.push('Buffer do PDF está vazio ou inválido.')
+      return result
+    }
+
     let extractedText = ''
 
     // Extrair texto
     try {
-      const pdfData = await pdfParse(buffer)
+      console.log(`📄 Iniciando extração de texto do PDF (tamanho: ${buffer.length} bytes)...`)
+      const pdfData = await pdfParse(buffer, {
+        max: 0, // Sem limite de páginas
+      })
       extractedText = pdfData.text || ''
 
+      console.log(`📝 Texto extraído: ${extractedText.length} caracteres`)
+
       if (extractedText.trim().length < 50) {
-        result.errors.push('PDF não contém texto suficiente para extração.')
+        result.errors.push('PDF não contém texto suficiente para extração. O PDF pode estar escaneado. Tente usar OCR.')
+        console.warn('⚠️ PDF com pouco texto extraído:', extractedText.substring(0, 200))
         return result
       }
-    } catch (pdfError) {
-      result.errors.push(`Erro ao extrair texto do PDF: ${pdfError instanceof Error ? pdfError.message : 'Erro desconhecido'}`)
+
+      // Log dos primeiros caracteres para debug
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📋 Primeiros 500 caracteres:', extractedText.substring(0, 500))
+      }
+    } catch (pdfError: any) {
+      const errorMsg = pdfError instanceof Error ? pdfError.message : String(pdfError)
+      console.error('❌ Erro ao extrair texto do PDF:', errorMsg)
+      result.errors.push(`Erro ao extrair texto do PDF: ${errorMsg}. Verifique se o arquivo é um PDF válido.`)
       return result
     }
 
