@@ -38,7 +38,7 @@ export default function AdminSimuladorConfigPage() {
     }
   }, [])
 
-  // Verificar se é admin
+  // Verificar se é admin (via role ou já autenticado por senha)
   useEffect(() => {
     if (session?.user?.role === 'ADMIN') {
       setIsAuthenticated(true)

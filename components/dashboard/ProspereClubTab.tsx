@@ -73,6 +73,7 @@ interface Reservation {
     time?: string
   }
   status: string
+  guestCount: number
   qrCode?: string
   qrCodeImage?: string
 }

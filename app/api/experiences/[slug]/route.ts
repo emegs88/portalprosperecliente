@@ -36,8 +36,10 @@ export async function GET(
     }
 
     // Calcular disponibilidade por data
-    const datesWithAvailability = experience.dates.map(date => {
-      const reservationsCount = date.reservations?.length || 0
+    const datesWithAvailability = await Promise.all(experience.dates.map(async (date) => {
+      const reservationsCount = await prisma.reservation.count({
+        where: { experienceDateId: date.id },
+      })
       const availableSlots = Math.max(0, date.availableSlots)
       
       return {
@@ -46,7 +48,7 @@ export async function GET(
         reservedSlots: reservationsCount,
         isAvailable: availableSlots > 0,
       }
-    })
+    }))
 
     // Verificar elegibilidade se usuário estiver autenticado
     let eligible = true

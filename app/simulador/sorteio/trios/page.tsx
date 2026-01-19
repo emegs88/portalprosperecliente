@@ -34,15 +34,17 @@ export default function TriosPage() {
   }
 
   const handleContinue = () => {
-    if (trios.length === 0 || !allTriosComplete(trios, config.trio.size)) {
+    const triosNumbers = trios.map(t => t.numbers)
+    if (trios.length === 0 || !allTriosComplete(triosNumbers, config.trio.size)) {
       return
     }
 
     router.push('/simulador/sorteio/sorteio')
   }
 
+  const triosNumbers = trios.map(t => t.numbers)
   const canContinue = trios.length >= config.trio.minTrios && 
-    allTriosComplete(trios, config.trio.size)
+    allTriosComplete(triosNumbers, config.trio.size)
 
   return (
     <div className="space-y-6">
