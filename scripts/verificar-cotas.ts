@@ -54,7 +54,7 @@ async function main() {
     }
 
     const creditDiff = Math.abs(totalCredit - expectedCredit)
-    const parcelaDiff = Math.abs(totalParcela - (expectedParcela * expectedCount))
+    const parcelaDiff = Math.abs(totalParcela - expectedParcela) // expectedParcela já é o total
 
     if (creditDiff > 0.01) {
       console.log(`   ⚠️ Crédito total diferente: Diferença de R$ ${creditDiff.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
