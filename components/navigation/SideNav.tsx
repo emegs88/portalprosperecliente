@@ -13,6 +13,7 @@ import {
   Target,
   Settings,
   LogOut,
+  Play,
 } from 'lucide-react'
 import { useSession, signOut } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
@@ -91,7 +92,7 @@ export function SideNav() {
                 : "text-gray-300 hover:bg-gray-700 hover:text-white"
             )}
           >
-            <Dice6 className={cn(
+            <Play className={cn(
               "w-5 h-5",
               pathname.includes('/simulador/sorteio') ? "text-white" : "text-gray-400 group-hover:text-white"
             )} />

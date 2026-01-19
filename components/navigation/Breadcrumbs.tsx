@@ -74,7 +74,6 @@ function generateBreadcrumbs(pathname: string): BreadcrumbItem[] {
     const labels: Record<string, string> = {
       'dashboard': 'Dashboard',
       'simulador': 'Simulador',
-      'sorteio': 'Sorteio',
       'configuracao': 'Configuração',
       'selecao': 'Seleção',
       'trios': 'Trios',
