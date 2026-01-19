@@ -62,6 +62,8 @@ interface AdminStats {
     total: number
     totalCredit: number
     totalInstallment: number
+    avgCredit: number
+    avgInstallment: number
     byStatus: Array<{ status: string; count: number }>
   }
   commissions: {
