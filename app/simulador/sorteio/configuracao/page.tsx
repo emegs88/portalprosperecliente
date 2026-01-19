@@ -62,14 +62,14 @@ export default function ConfiguracaoPage() {
         </p>
       </div>
 
-        {/* Seleção de Modo */}
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-white">Modo de Simulação</h2>
-          <ModeSelector selected={selectedMode} onSelect={setSelectedMode} />
-        </div>
+      {/* Seleção de Modo */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold text-white">Modo de Simulação</h2>
+        <ModeSelector selected={selectedMode} onSelect={setSelectedMode} />
+      </div>
 
-        {/* Opções Avançadas */}
-        <Accordion type="single" collapsible className="w-full">
+      {/* Opções Avançadas */}
+      <Accordion type="single" collapsible className="w-full">
           <AccordionItem value="advanced" className="border-gray-700">
             <AccordionTrigger className="text-white hover:text-gray-300">
               <div className="flex items-center gap-2">
@@ -155,16 +155,15 @@ export default function ConfiguracaoPage() {
               </div>
             </AccordionContent>
           </AccordionItem>
-        </Accordion>
+      </Accordion>
 
-        {/* Navegação */}
-        <QuickNav
-          onNext={handleContinue}
-          nextLabel="Continuar para Seleção"
-          backLabel="Voltar ao Início"
-          showHome={true}
-        />
-      </div>
+      {/* Navegação */}
+      <QuickNav
+        onNext={handleContinue}
+        nextLabel="Continuar para Seleção"
+        backLabel="Voltar ao Início"
+        showHome={true}
+      />
     </div>
   )
 }
