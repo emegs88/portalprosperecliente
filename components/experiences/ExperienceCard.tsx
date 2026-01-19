@@ -89,12 +89,12 @@ export function ExperienceCard({ experience, onReserve }: ExperienceCardProps) {
         )}
         <Button
           onClick={onReserve}
-          disabled={!experience.eligible || (experience.availableSlots !== null && experience.availableSlots <= 0)}
+          disabled={!experience.eligible || (experience.availableSlots !== null && experience.availableSlots !== undefined && experience.availableSlots <= 0)}
           className="w-full"
           variant={experience.eligible ? 'default' : 'outline'}
         >
           {experience.eligible
-            ? experience.availableSlots !== null && experience.availableSlots <= 0
+            ? experience.availableSlots !== null && experience.availableSlots !== undefined && experience.availableSlots <= 0
               ? 'Esgotado'
               : 'Ver Detalhes'
             : 'Ver Elegibilidade'}
