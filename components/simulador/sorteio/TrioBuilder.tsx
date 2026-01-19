@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCenter, useDroppable } from '@dnd-kit/core'
+import { DndContext, DragEndEvent, DragStartEvent, closestCenter, useDroppable, useDraggable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -19,14 +19,44 @@ interface TrioBuilderProps {
   onTriosChange: (trios: Trio[]) => void
 }
 
+// Componente para números arrastáveis
+function DraggableNumber({ num }: { num: number }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `num-${num}`,
+  })
+
+  const style = transform ? {
+    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+  } : undefined
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className={cn(
+        "inline-flex items-center px-3 py-1 rounded-full bg-gray-700 text-gray-300 text-sm font-medium",
+        isDragging ? "opacity-50 cursor-grabbing" : "cursor-grab active:cursor-grabbing"
+      )}
+    >
+      {num.toString().padStart(2, '0')}
+    </div>
+  )
+}
+
 function SortableTrioCard({ trio, onUpdate, onRemove, config }: {
   trio: Trio
   onUpdate: (trio: Trio) => void
   onRemove: () => void
   config: any
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: `sortable-${trio.id}` })
-  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: `dropzone-${trio.id}` })
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ 
+    id: `sortable-${trio.id}` 
+  })
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ 
+    id: `dropzone-${trio.id}` 
+  })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -38,7 +68,14 @@ function SortableTrioCard({ trio, onUpdate, onRemove, config }: {
   const hasDupes = hasDuplicatesInTrio(trio.numbers)
 
   return (
-    <div ref={(node) => { setNodeRef(node); setDropRef(node) }} style={style} className="touch-none">
+    <div 
+      ref={(node) => { 
+        setNodeRef(node)
+        setDropRef(node)
+      }} 
+      style={style} 
+      className="touch-none"
+    >
       <Card className={cn(
         "bg-gray-800 border-gray-700",
         isComplete && !hasDupes && "border-green-500 bg-green-500/10",
@@ -148,8 +185,8 @@ export function TrioBuilder({ selectedNumbers, trios, onTriosChange }: TrioBuild
     const overIdStr = over.id.toString()
 
     // Verificar se está arrastando um número para um trio
-    if (!isNaN(parseInt(activeIdStr)) && overIdStr.startsWith('dropzone-')) {
-      const number = parseInt(activeIdStr)
+    if (activeIdStr.startsWith('num-') && overIdStr.startsWith('dropzone-')) {
+      const number = parseInt(activeIdStr.replace('num-', ''))
       const trioId = overIdStr.replace('dropzone-', 'trio-')
       const trio = trios.find(t => t.id === trioId)
       
@@ -222,58 +259,48 @@ export function TrioBuilder({ selectedNumbers, trios, onTriosChange }: TrioBuild
   const allComplete = trios.every(t => isValidTrio(t.numbers, config.trio.size))
 
   return (
-    <div className="space-y-6">
-      {/* Chips de números disponíveis */}
-      {availableNumbers.length > 0 && (
-        <div className="space-y-2">
-          <h3 className="text-sm font-medium text-gray-300">Números Disponíveis (arraste para os trios)</h3>
-          <DndContext
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
+    <DndContext
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="space-y-6">
+        {/* Chips de números disponíveis */}
+        {availableNumbers.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium text-gray-300">
+              Números Disponíveis (arraste para os trios)
+            </h3>
             <div className="flex flex-wrap gap-2">
               {availableNumbers.map(num => (
-                <div
-                  key={num}
-                  data-id={num}
-                  draggable
-                  className="inline-flex items-center px-3 py-1 rounded-full bg-gray-700 text-gray-300 text-sm font-medium cursor-grab active:cursor-grabbing"
-                >
-                  {num.toString().padStart(2, '0')}
-                </div>
+                <DraggableNumber key={num} num={num} />
               ))}
             </div>
-          </DndContext>
-        </div>
-      )}
-
-      {/* Ações */}
-      <div className="flex gap-2 flex-wrap">
-        <Button variant="outline" onClick={handleNewTrio}>
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Trio
-        </Button>
-        <Button variant="outline" onClick={handleAutoMount} disabled={availableNumbers.length === 0}>
-          Auto-montar Trios
-        </Button>
-        {trios.length > 0 && (
-          <Button variant="outline" onClick={() => onTriosChange([])}>
-            Limpar Trios
-          </Button>
+          </div>
         )}
-      </div>
 
-      {/* Trios */}
-      {trios.length > 0 ? (
-        <DndContext
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
+        {/* Ações */}
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" onClick={handleNewTrio}>
+            <Plus className="w-4 h-4 mr-2" />
+            Novo Trio
+          </Button>
+          <Button variant="outline" onClick={handleAutoMount} disabled={availableNumbers.length === 0}>
+            Auto-montar Trios
+          </Button>
+          {trios.length > 0 && (
+            <Button variant="outline" onClick={() => onTriosChange([])}>
+              Limpar Trios
+            </Button>
+          )}
+        </div>
+
+        {/* Trios */}
+        {trios.length > 0 ? (
           <SortableContext items={trios.map(t => `sortable-${t.id}`)} strategy={verticalListSortingStrategy}>
             <div className="space-y-4">
               {trios.map((trio) => (
-                <TrioBuilder
+                <SortableTrioCard
                   key={trio.id}
                   trio={trio}
                   onUpdate={handleUpdateTrio}
@@ -283,42 +310,25 @@ export function TrioBuilder({ selectedNumbers, trios, onTriosChange }: TrioBuild
               ))}
             </div>
           </SortableContext>
-        </DndContext>
-      ) : (
-        <Card className="bg-gray-800 border-gray-700 border-dashed">
-          <CardContent className="py-12 text-center">
-            <p className="text-gray-400">
-              Nenhum trio criado ainda. Arraste números ou clique em "Novo Trio".
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Status */}
-      <div className="text-sm text-gray-400 text-center">
-        {trios.length > 0 && (
-          <span>
-            {trios.filter(t => isValidTrio(t.numbers, config.trio.size)).length} de {trios.length} trios completo(s)
-          </span>
+        ) : (
+          <Card className="bg-gray-800 border-gray-700 border-dashed">
+            <CardContent className="py-12 text-center">
+              <p className="text-gray-400">
+                Nenhum trio criado ainda. Arraste números ou clique em "Novo Trio".
+              </p>
+            </CardContent>
+          </Card>
         )}
-      </div>
-    </div>
-  )
-}
 
-// Corrigir função TrioBuilder que estava faltando
-function TrioBuilder({ trio, onUpdate, onRemove, config }: {
-  trio: Trio
-  onUpdate: (trio: Trio) => void
-  onRemove: () => void
-  config: any
-}) {
-  return (
-    <SortableTrioCard
-      trio={trio}
-      onUpdate={onUpdate}
-      onRemove={onRemove}
-      config={config}
-    />
+        {/* Status */}
+        <div className="text-sm text-gray-400 text-center">
+          {trios.length > 0 && (
+            <span>
+              {trios.filter(t => isValidTrio(t.numbers, config.trio.size)).length} de {trios.length} trios completo(s)
+            </span>
+          )}
+        </div>
+      </div>
+    </DndContext>
   )
 }
