@@ -20,9 +20,9 @@ export default function HomePage() {
                 Entrar
               </Button>
             </Link>
-            <Link href="/cadastro" className="block">
+            <Link href="/acessos" className="block">
               <Button variant="outline" size="lg" className="w-full">
-                Criar Conta
+                Acessar Portal
               </Button>
             </Link>
           </div>
