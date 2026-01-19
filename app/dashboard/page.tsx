@@ -65,13 +65,13 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen bg-[#070B14]">
       <BrandHeader />
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-white">Dashboard</h1>
-            <p className="text-gray-400 mt-1">Bem-vindo ao portal Prospere</p>
+          <h1 className="text-3xl font-bold text-[#FFFFFF]">Dashboard</h1>
+          <p className="text-[#9CA3AF] mt-1">Bem-vindo ao portal Prospere</p>
           </div>
           <LogoutButton />
         </div>
@@ -112,52 +112,52 @@ export default function DashboardPage() {
           }} 
           className="w-full"
         >
-          <TabsList className="grid w-full grid-cols-4 md:grid-cols-8 bg-gray-800 gap-1 p-1">
+          <TabsList className="grid w-full grid-cols-4 md:grid-cols-8 bg-[#0B1220] border border-[rgba(255,255,255,0.08)] gap-1 p-1 rounded-lg">
             <TabsTrigger 
               value="dashboard"
-              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+              className="data-[state=active]:bg-[#111B2E] data-[state=active]:text-[#FFFFFF] data-[state=active]:border data-[state=active]:border-[rgba(59,130,246,0.35)] text-[#9CA3AF] hover:text-[#FFFFFF] hover:bg-[rgba(255,255,255,0.05)] rounded-md transition-all duration-200"
             >
               Dashboard
             </TabsTrigger>
             <TabsTrigger 
               value="prospere-club"
-              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+              className="data-[state=active]:bg-[#111B2E] data-[state=active]:text-[#FFFFFF] data-[state=active]:border data-[state=active]:border-[rgba(59,130,246,0.35)] text-[#9CA3AF] hover:text-[#FFFFFF] hover:bg-[rgba(255,255,255,0.05)] rounded-md transition-all duration-200"
             >
               Prospere Club
             </TabsTrigger>
             <TabsTrigger 
               value="cotas"
-              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+              className="data-[state=active]:bg-[#111B2E] data-[state=active]:text-[#FFFFFF] data-[state=active]:border data-[state=active]:border-[rgba(59,130,246,0.35)] text-[#9CA3AF] hover:text-[#FFFFFF] hover:bg-[rgba(255,255,255,0.05)] rounded-md transition-all duration-200"
             >
               Cotas
             </TabsTrigger>
             <TabsTrigger 
               value="importacoes"
-              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+              className="data-[state=active]:bg-[#111B2E] data-[state=active]:text-[#FFFFFF] data-[state=active]:border data-[state=active]:border-[rgba(59,130,246,0.35)] text-[#9CA3AF] hover:text-[#FFFFFF] hover:bg-[rgba(255,255,255,0.05)] rounded-md transition-all duration-200"
             >
               Importações
             </TabsTrigger>
             <TabsTrigger 
               value="patrimonio"
-              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+              className="data-[state=active]:bg-[#111B2E] data-[state=active]:text-[#FFFFFF] data-[state=active]:border data-[state=active]:border-[rgba(59,130,246,0.35)] text-[#9CA3AF] hover:text-[#FFFFFF] hover:bg-[rgba(255,255,255,0.05)] rounded-md transition-all duration-200"
             >
               Patrimônio
             </TabsTrigger>
             <TabsTrigger 
               value="prospere-vida"
-              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+              className="data-[state=active]:bg-[#111B2E] data-[state=active]:text-[#FFFFFF] data-[state=active]:border data-[state=active]:border-[rgba(59,130,246,0.35)] text-[#9CA3AF] hover:text-[#FFFFFF] hover:bg-[rgba(255,255,255,0.05)] rounded-md transition-all duration-200"
             >
               Prospere Vida
             </TabsTrigger>
             <TabsTrigger 
               value="simulacoes"
-              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+              className="data-[state=active]:bg-[#111B2E] data-[state=active]:text-[#FFFFFF] data-[state=active]:border data-[state=active]:border-[rgba(59,130,246,0.35)] text-[#9CA3AF] hover:text-[#FFFFFF] hover:bg-[rgba(255,255,255,0.05)] rounded-md transition-all duration-200"
             >
               Simulações
             </TabsTrigger>
             <TabsTrigger 
               value="plano-carreira"
-              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+              className="data-[state=active]:bg-[#111B2E] data-[state=active]:text-[#FFFFFF] data-[state=active]:border data-[state=active]:border-[rgba(59,130,246,0.35)] text-[#9CA3AF] hover:text-[#FFFFFF] hover:bg-[rgba(255,255,255,0.05)] rounded-md transition-all duration-200"
             >
               Plano de Carreira
             </TabsTrigger>

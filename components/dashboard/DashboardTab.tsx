@@ -1,20 +1,17 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { StatCard } from './StatCard'
 import { formatCurrency, formatCurrencyCompact, formatPercent } from '@/lib/utils'
 import { DashboardSkeleton } from './LoadingSkeleton'
 import { useToast } from '@/components/ui/use-toast'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
   PieChart,
   Pie,
   Cell,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -22,7 +19,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts'
-import { TrendingUp, DollarSign, Percent, Calendar, Award, Target, Zap } from 'lucide-react'
+import { TrendingUp, DollarSign, Percent, Calendar, Award, Target } from 'lucide-react'
 
 export function DashboardTab() {
   const [data, setData] = useState<any>(null)
@@ -34,7 +31,7 @@ export function DashboardTab() {
     try {
       setError(null)
       const res = await fetch('/api/dashboard', {
-        next: { revalidate: 30 }, // Cache por 30 segundos
+        next: { revalidate: 30 },
       })
       
       if (!res.ok) {
@@ -84,14 +81,14 @@ export function DashboardTab() {
 
   if (error || !data) {
     return (
-      <Card className="bg-gray-800 border-red-500/50">
+      <Card className="bg-[#0B1220] border-[rgba(239,68,68,0.3)] shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_18px_40px_rgba(0,0,0,0.55)]">
         <CardContent className="pt-6">
           <div className="text-center space-y-4">
-            <p className="text-red-400 font-medium">Erro ao carregar dados</p>
-            <p className="text-gray-400 text-sm">{error || 'Dados não disponíveis'}</p>
+            <p className="text-[#EF4444] font-medium">Erro ao carregar dados</p>
+            <p className="text-[#9CA3AF] text-sm">{error || 'Dados não disponíveis'}</p>
             <button
               onClick={fetchDashboard}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              className="px-4 py-2 bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-lg transition-colors"
             >
               Tentar Novamente
             </button>
@@ -106,198 +103,126 @@ export function DashboardTab() {
   return (
     <div className="space-y-8">
       {/* Header com frase da marca */}
-      <div className="bg-gradient-to-r from-blue-600/20 via-blue-700/20 to-blue-800/20 border-l-4 border-blue-500 rounded-lg p-6">
-        <h1 className="text-3xl font-bold text-white mb-2">
+      <div className="bg-[#0B1220] border border-[rgba(59,130,246,0.35)] border-l-4 rounded-2xl p-6 shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_18px_40px_rgba(0,0,0,0.55)]">
+        <h1 className="text-3xl font-bold text-[#FFFFFF] mb-2">
           Você não precisa de sorte. Precisa de estratégia.
         </h1>
-        <p className="text-gray-300 text-lg">
+        <p className="text-[#9CA3AF] text-lg">
           Acompanhe sua jornada para construir patrimônio através do consórcio
         </p>
       </div>
 
-      {/* Cards Principais - Estilo Prospere Limpo */}
+      {/* Cards Principais - Primeira Linha */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-blue-600/20 to-blue-800/20 border-blue-500/50 hover:border-blue-400 transition-all">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-blue-200 flex items-center gap-2">
-              <Target className="w-5 h-5 text-blue-400" />
-              Total de Cotas
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-white mb-1">
-              {data.totalCotas || 0}
-            </div>
-            <p className="text-xs text-blue-300/80 mt-1">
-              {data.cotasContempladas || 0} contempladas • {data.cotasNaoContempladas || 0} não contempladas
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Total de Cotas"
+          value={data.totalCotas || 0}
+          description={`${data.cotasContempladas || 0} contempladas • ${data.cotasNaoContempladas || 0} não contempladas`}
+          icon={Target}
+          variant="default"
+        />
 
-        <Card className="bg-gradient-to-br from-blue-600/20 to-blue-800/20 border-blue-500/50 hover:border-blue-400 transition-all">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-blue-200 flex items-center gap-2">
-              <DollarSign className="w-5 h-5 text-blue-400" />
-              Crédito Total
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white break-words">
-              {formatCurrencyCompact(data.totalCredit || 0)}
-            </div>
-            <p className="text-xs text-blue-300/80 mt-1">
-              Valor total dos bens
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Crédito Total"
+          value={formatCurrencyCompact(data.totalCredit || 0)}
+          description="Valor total dos bens"
+          icon={DollarSign}
+          variant="default"
+        />
 
-        <Card className="bg-gradient-to-br from-blue-600/20 to-blue-800/20 border-blue-500/50 hover:border-blue-400 transition-all">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-blue-200 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-blue-400" />
-              Parcela Mensal
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white break-words">
-              {formatCurrencyCompact(data.monthlyInstallment || 0)}
-            </div>
-            <p className="text-xs text-blue-300/80 mt-1">
-              Aporte mensal total
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Parcela Mensal"
+          value={formatCurrencyCompact(data.monthlyInstallment || 0)}
+          description="Aporte mensal total"
+          icon={Calendar}
+          variant="default"
+        />
 
-        <Card className="bg-gradient-to-br from-blue-600/20 to-blue-800/20 border-blue-500/50 hover:border-blue-400 transition-all">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-blue-200 flex items-center gap-2">
-              <Award className="w-5 h-5 text-blue-400" />
-              Total a Receber
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white break-words">
-              {formatCurrencyCompact(data.totalToReceive || 0)}
-            </div>
-            <p className="text-xs text-blue-300/80 mt-1">
-              Valor das cotas contempladas
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Total a Receber"
+          value={formatCurrencyCompact(data.totalToReceive || 0)}
+          description="Valor das cotas contempladas"
+          icon={Award}
+          variant="default"
+        />
       </div>
 
       {/* Segunda Linha - Métricas de Estratégia */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-blue-600/20 to-blue-800/20 border-blue-500/50 hover:border-blue-400 transition-all">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-blue-200 flex items-center gap-2">
-              <Target className="w-5 h-5 text-blue-400" />
-              Patrimônio Acumulado
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white break-words">
-              {formatCurrencyCompact(data.patrimonioAcumulado || 0)}
-            </div>
-            <p className="text-xs text-blue-300/80 mt-1">
-              Valor acumulado atual
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Patrimônio Acumulado"
+          value={formatCurrencyCompact(data.patrimonioAcumulado || 0)}
+          description="Valor acumulado atual"
+          icon={Target}
+          variant="default"
+        />
 
-        <Card className={`bg-gradient-to-br ${ganhoPatrimonio >= 0 ? 'from-blue-600/20 to-blue-800/20 border-blue-500/50' : 'from-red-600/20 to-red-800/20 border-red-500/50'} hover:opacity-90 transition-all`}>
-          <CardHeader className="pb-2">
-            <CardTitle className={`text-sm font-medium flex items-center gap-2 ${ganhoPatrimonio >= 0 ? 'text-blue-200' : 'text-red-200'}`}>
-              <TrendingUp className={`w-5 h-5 ${ganhoPatrimonio >= 0 ? 'text-blue-400' : 'text-red-400'}`} />
-              Ganho de Patrimônio
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold break-words ${ganhoPatrimonio >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
-              {formatCurrencyCompact(ganhoPatrimonio)}
-            </div>
-            <p className={`text-xs mt-1 ${ganhoPatrimonio >= 0 ? 'text-blue-300/80' : 'text-red-300/80'}`}>
-              Diferença vs total pago
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Ganho de Patrimônio"
+          value={formatCurrencyCompact(ganhoPatrimonio)}
+          description="Diferença vs total pago"
+          icon={TrendingUp}
+          variant={ganhoPatrimonio >= 0 ? 'positive' : 'negative'}
+        />
 
-        <Card className={`bg-gradient-to-br ${roi >= 0 ? 'from-blue-600/20 to-blue-800/20 border-blue-500/50' : 'from-red-600/20 to-red-800/20 border-red-500/50'} hover:opacity-90 transition-all`}>
-          <CardHeader className="pb-2">
-            <CardTitle className={`text-sm font-medium flex items-center gap-2 ${roi >= 0 ? 'text-blue-200' : 'text-red-200'}`}>
-              <Percent className={`w-5 h-5 ${roi >= 0 ? 'text-blue-400' : 'text-red-400'}`} />
-              ROI
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${roi >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
-              {formatPercent(roi)}
-            </div>
-            <p className={`text-xs mt-1 ${roi >= 0 ? 'text-blue-300/80' : 'text-red-300/80'}`}>
-              Retorno sobre investimento
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="ROI"
+          value={formatPercent(roi)}
+          description="Retorno sobre investimento"
+          icon={Percent}
+          variant={roi >= 0 ? 'positive' : 'negative'}
+        />
 
-        <Card className="bg-gradient-to-br from-blue-600/20 to-blue-800/20 border-blue-500/50 hover:border-blue-400 transition-all">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-blue-200 flex items-center gap-2">
-              <Percent className="w-5 h-5 text-blue-400" />
-              % Médio Pago
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">
-              {formatPercent(data.totalPercentPago || 0)}
-            </div>
-            <p className="text-xs text-blue-300/80 mt-1">
-              Percentual médio pago
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="% Médio Pago"
+          value={formatPercent(data.totalPercentPago || 0)}
+          description="Percentual médio pago"
+          icon={Percent}
+          variant="default"
+        />
       </div>
 
       {/* Seção: Pilares da Estratégia */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-blue-600/10 to-blue-800/10 border-blue-500/30 hover:border-blue-400/50 transition-all">
-          <CardHeader>
-            <CardTitle className="text-white text-lg font-bold">Sem juros</CardTitle>
+        <Card className="bg-[#0B1220] border border-[rgba(255,255,255,0.08)] rounded-2xl p-6 shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_18px_40px_rgba(0,0,0,0.55)] hover:translate-y-[-2px] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_24px_48px_rgba(0,0,0,0.65)] hover:border-[rgba(255,255,255,0.15)] transition-all duration-200">
+          <CardHeader className="p-0 pb-3">
+            <CardTitle className="text-[#FFFFFF] text-lg font-bold">Sem juros</CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-gray-300 text-sm">
+          <CardContent className="p-0">
+            <p className="text-[#9CA3AF] text-sm leading-relaxed">
               Consórcio é investimento sem juros. Você paga apenas a administração e constrói patrimônio.
             </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-blue-600/10 to-blue-800/10 border-blue-500/30 hover:border-blue-400/50 transition-all">
-          <CardHeader>
-            <CardTitle className="text-white text-lg font-bold">Planejamento inteligente</CardTitle>
+        <Card className="bg-[#0B1220] border border-[rgba(255,255,255,0.08)] rounded-2xl p-6 shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_18px_40px_rgba(0,0,0,0.55)] hover:translate-y-[-2px] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_24px_48px_rgba(0,0,0,0.65)] hover:border-[rgba(255,255,255,0.15)] transition-all duration-200">
+          <CardHeader className="p-0 pb-3">
+            <CardTitle className="text-[#FFFFFF] text-lg font-bold">Planejamento inteligente</CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-gray-300 text-sm">
+          <CardContent className="p-0">
+            <p className="text-[#9CA3AF] text-sm leading-relaxed">
               Estratégia definida: {formatPercent(data.totalPercentPago || 0)} já pagos. {formatCurrencyCompact(data.patrimonioAcumulado || 0)} de patrimônio acumulado.
             </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-blue-600/10 to-blue-800/10 border-blue-500/30 hover:border-blue-400/50 transition-all">
-          <CardHeader>
-            <CardTitle className="text-white text-lg font-bold">Cartas contempladas</CardTitle>
+        <Card className="bg-[#0B1220] border border-[rgba(255,255,255,0.08)] rounded-2xl p-6 shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_18px_40px_rgba(0,0,0,0.55)] hover:translate-y-[-2px] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_24px_48px_rgba(0,0,0,0.65)] hover:border-[rgba(255,255,255,0.15)] transition-all duration-200">
+          <CardHeader className="p-0 pb-3">
+            <CardTitle className="text-[#FFFFFF] text-lg font-bold">Cartas contempladas</CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-gray-300 text-sm">
+          <CardContent className="p-0">
+            <p className="text-[#9CA3AF] text-sm leading-relaxed">
               {data.cotasContempladas || 0} de {data.totalCotas || 0} cotas já contempladas. Total a receber: {formatCurrencyCompact(data.totalToReceive || 0)}.
             </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-blue-600/10 to-blue-800/10 border-blue-500/30 hover:border-blue-400/50 transition-all">
-          <CardHeader>
-            <CardTitle className="text-white text-lg font-bold">Investimento patrimonial</CardTitle>
+        <Card className="bg-[#0B1220] border border-[rgba(255,255,255,0.08)] rounded-2xl p-6 shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_18px_40px_rgba(0,0,0,0.55)] hover:translate-y-[-2px] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_24px_48px_rgba(0,0,0,0.65)] hover:border-[rgba(255,255,255,0.15)] transition-all duration-200">
+          <CardHeader className="p-0 pb-3">
+            <CardTitle className="text-[#FFFFFF] text-lg font-bold">Investimento patrimonial</CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-gray-300 text-sm">
+          <CardContent className="p-0">
+            <p className="text-[#9CA3AF] text-sm leading-relaxed">
               ROI de {formatPercent(roi)}. Patrimônio atual: {formatCurrencyCompact(data.patrimonioAcumulado || 0)}.
             </p>
           </CardContent>
@@ -307,10 +232,10 @@ export function DashboardTab() {
       {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Gráfico de Pizza: Distribuição de Cotas */}
-        <Card className="bg-black/50 border-blue-600/30">
+        <Card className="bg-[#0B1220] border border-[rgba(255,255,255,0.08)] rounded-2xl shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_18px_40px_rgba(0,0,0,0.55)]">
           <CardHeader>
-            <CardTitle className="text-white text-lg">Distribuição de Cotas</CardTitle>
-            <p className="text-sm text-gray-400">
+            <CardTitle className="text-[#FFFFFF] text-lg">Distribuição de Cotas</CardTitle>
+            <p className="text-[#9CA3AF] text-sm">
               Cotas contempladas vs não contempladas
             </p>
           </CardHeader>
@@ -335,11 +260,12 @@ export function DashboardTab() {
                   <Tooltip
                     formatter={(value: number) => [`${value} cotas`, 'Quantidade']}
                     contentStyle={{ 
-                      backgroundColor: '#1F2937', 
-                      border: '1px solid #374151', 
+                      backgroundColor: '#0B1220', 
+                      border: '1px solid rgba(255,255,255,0.08)', 
                       borderRadius: '8px',
-                      color: '#F3F4F6'
+                      color: '#FFFFFF'
                     }}
+                    labelStyle={{ color: '#FFFFFF', marginBottom: '8px' }}
                   />
                   <Legend 
                     wrapperStyle={{ color: '#9CA3AF', paddingTop: '20px' }}
@@ -351,10 +277,10 @@ export function DashboardTab() {
         </Card>
 
         {/* Gráfico de Barras: Resumo Financeiro */}
-        <Card className="bg-black/50 border-blue-600/30">
+        <Card className="bg-[#0B1220] border border-[rgba(255,255,255,0.08)] rounded-2xl shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_18px_40px_rgba(0,0,0,0.55)]">
           <CardHeader>
-            <CardTitle className="text-white text-lg">Resumo Financeiro</CardTitle>
-            <p className="text-sm text-gray-400">
+            <CardTitle className="text-[#FFFFFF] text-lg">Resumo Financeiro</CardTitle>
+            <p className="text-[#9CA3AF] text-sm">
               Principais valores do consórcio
             </p>
           </CardHeader>
@@ -385,7 +311,7 @@ export function DashboardTab() {
                       <stop offset="95%" stopColor="#EF4444" stopOpacity={0.3}/>
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
                   <XAxis 
                     dataKey="name" 
                     stroke="#9CA3AF"
@@ -402,12 +328,12 @@ export function DashboardTab() {
                   <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
                     contentStyle={{ 
-                      backgroundColor: '#1F2937', 
-                      border: '1px solid #374151', 
+                      backgroundColor: '#0B1220', 
+                      border: '1px solid rgba(255,255,255,0.08)', 
                       borderRadius: '8px',
-                      color: '#F3F4F6'
+                      color: '#FFFFFF'
                     }}
-                    labelStyle={{ color: '#F3F4F6' }}
+                    labelStyle={{ color: '#FFFFFF', marginBottom: '8px' }}
                   />
                   <Legend 
                     wrapperStyle={{ color: '#9CA3AF', paddingTop: '20px' }}
