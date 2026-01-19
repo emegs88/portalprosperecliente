@@ -13,7 +13,7 @@ import {
   getLevels,
   getPlan,
   type CommissionResult,
-} from '@/lib/services/commissionService'
+} from '@/lib/domain/commission/services/commissionService'
 import {
   PieChart,
   Pie,

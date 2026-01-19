@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getUserClubStatus } from '@/lib/services/clubService'
+import { getUserClubStatus } from '@/lib/domain/experience/services/clubService'
 
 export const dynamic = 'force-dynamic'
 

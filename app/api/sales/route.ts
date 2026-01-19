@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { calculateAndSaveCommission } from '@/lib/services/commissionService'
+import { calculateAndSaveCommission } from '@/lib/domain/commission/services/commissionService'
 
 export const dynamic = 'force-dynamic'
 
