@@ -54,8 +54,8 @@ export default function DashboardPage() {
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-white">Carregando...</div>
+      <div className="min-h-screen bg-[#070B14] flex items-center justify-center">
+        <div className="text-[#FFFFFF]">Carregando...</div>
       </div>
     )
   }
