@@ -51,8 +51,8 @@ export const authOptions: NextAuthOptions = {
           return {
             id: user.id,
             email: user.email,
-            name: user.name || undefined,
-            role: user.role || 'USER',
+            name: user.name || user.email.split('@')[0], // Garantir que name sempre seja string
+            role: user.role || 'CLIENTE',
           }
         } catch (error) {
           console.error('❌ Erro no authorize:', error)
