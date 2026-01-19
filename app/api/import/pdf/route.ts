@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { parsePDF } from '@/lib/services/pdfParser'
 import { parsePDFEnhanced } from '@/lib/services/pdfParserEnhanced'
 import { parsePDFImproved } from '@/lib/services/pdfParserImproved'
+import { parsePDFImproved } from '@/lib/services/pdfParserImproved'
 import { parsePDFWithOCR } from '@/lib/services/pdfParserWithOCR'
 import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
@@ -47,19 +48,19 @@ export async function POST(request: NextRequest) {
 
     await writeFile(filepath, buffer)
 
-    // Tentar parse melhorado primeiro
-    let parseResult = await parsePDFEnhanced(buffer, false)
+    // Tentar parse melhorado primeiro (focado em valores brasileiros corretos)
+    console.log('🔄 Tentando parse melhorado do PDF (valores BR)...')
+    let parseResult = await parsePDFImproved(buffer, false)
 
-    // Se não encontrou cotas, tentar parse normal
-    if (parseResult.quotas.length === 0) {
-      try {
-        const normalResult = await parsePDF(buffer)
-        if (normalResult.quotas.length > 0) {
-          parseResult = normalResult
-        }
-      } catch (normalError) {
-        console.warn('Parse normal falhou:', normalError)
+    // Se não encontrou cotas, tentar enhanced como fallback
+    if (parseResult.quotas.length === 0 || parseResult.quotas.some(q => !q.vlBem || !q.vlParcela)) {
+      console.log('⚠️ Parse melhorado incompleto, tentando enhanced...')
+      const enhancedResult = await parsePDFEnhanced(buffer, false)
+      if (enhancedResult.quotas.length > 0) {
+        parseResult = enhancedResult
       }
+    } else {
+      console.log(`✅ Parse melhorado encontrou ${parseResult.quotas.length} cotas`)
     }
 
     if (parseResult.errors.length > 0 && parseResult.quotas.length === 0) {
