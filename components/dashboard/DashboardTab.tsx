@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrency, formatCurrencyCompact, formatPercent } from '@/lib/utils'
+import { DashboardSkeleton } from './LoadingSkeleton'
+import { useToast } from '@/components/ui/use-toast'
 import {
   LineChart,
   Line,
@@ -25,53 +27,81 @@ import { TrendingUp, DollarSign, Percent, Calendar, Award, Target, Zap } from 'l
 export function DashboardTab() {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const { toast } = useToast()
 
-  useEffect(() => {
-    fetchDashboard()
-  }, [])
-
-  const fetchDashboard = async () => {
+  const fetchDashboard = useCallback(async () => {
     try {
-      const res = await fetch('/api/dashboard')
-      if (res.ok) {
-        const data = await res.json()
-        setData(data)
+      setError(null)
+      const res = await fetch('/api/dashboard', {
+        next: { revalidate: 30 }, // Cache por 30 segundos
+      })
+      
+      if (!res.ok) {
+        throw new Error(`Erro ${res.status}: ${res.statusText}`)
       }
-    } catch (error) {
-      console.error('Error fetching dashboard:', error)
+      
+      const data = await res.json()
+      setData(data)
+    } catch (err: any) {
+      console.error('Error fetching dashboard:', err)
+      setError(err.message || 'Erro ao carregar dados')
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao carregar dados',
+        description: 'Não foi possível carregar os dados do dashboard. Tente novamente.',
+      })
     } finally {
       setLoading(false)
     }
-  }
+  }, [toast])
+
+  useEffect(() => {
+    fetchDashboard()
+  }, [fetchDashboard])
+
+  // Memoizar cálculos pesados
+  const calculations = useMemo(() => {
+    if (!data) return null
+
+    const pieData = [
+      { name: 'Contempladas', value: data.cotasContempladas || 0, color: '#10B981' },
+      { name: 'Não Contempladas', value: (data.totalCotas || 0) - (data.cotasContempladas || 0), color: '#EF4444' },
+    ]
+
+    const totalPagoAproximado = (data.totalParcelaPagas || 0) * (data.monthlyInstallment || 0)
+    const ganhoPatrimonio = (data.patrimonioAcumulado || 0) - totalPagoAproximado
+    const roi = totalPagoAproximado > 0 
+      ? ((data.patrimonioAcumulado || 0) / totalPagoAproximado - 1) * 100 
+      : 0
+
+    return { pieData, totalPagoAproximado, ganhoPatrimonio, roi }
+  }, [data])
 
   if (loading) {
+    return <DashboardSkeleton />
+  }
+
+  if (error || !data) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-white">Carregando dados...</div>
-      </div>
+      <Card className="bg-gray-800 border-red-500/50">
+        <CardContent className="pt-6">
+          <div className="text-center space-y-4">
+            <p className="text-red-400 font-medium">Erro ao carregar dados</p>
+            <p className="text-gray-400 text-sm">{error || 'Dados não disponíveis'}</p>
+            <button
+              onClick={fetchDashboard}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+            >
+              Tentar Novamente
+            </button>
+          </div>
+        </CardContent>
+      </Card>
     )
   }
 
-  if (!data) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-white">Erro ao carregar dados</div>
-      </div>
-    )
-  }
-
-  // Dados para gráfico de pizza
-  const pieData = [
-    { name: 'Contempladas', value: data.cotasContempladas || 0, color: '#10B981' },
-    { name: 'Não Contempladas', value: (data.totalCotas || 0) - (data.cotasContempladas || 0), color: '#EF4444' },
-  ]
-
-  // Calcular ganho
-  const totalPagoAproximado = (data.totalParcelaPagas || 0) * (data.monthlyInstallment || 0)
-  const ganhoPatrimonio = (data.patrimonioAcumulado || 0) - totalPagoAproximado
-  const roi = totalPagoAproximado > 0 
-    ? ((data.patrimonioAcumulado || 0) / totalPagoAproximado - 1) * 100 
-    : 0
+  const { pieData, ganhoPatrimonio, roi } = calculations!
 
   return (
     <div className="space-y-8">

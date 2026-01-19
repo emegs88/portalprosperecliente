@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useToast } from '@/components/ui/use-toast'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -72,17 +73,31 @@ export function SimulacoesTab() {
 
   const fetchQuotas = async () => {
     try {
-      const res = await fetch('/api/cotas')
-      if (res.ok) {
-        const data = await res.json()
-        setQuotas(data.quotas || [])
-        // Selecionar todas as cotas por padrão
-        if (data.quotas && data.quotas.length > 0) {
-          setSelectedQuotas(new Set(data.quotas.map((q: Quota) => q.id)))
-        }
+      setLoading(true)
+      const res = await fetch('/api/cotas', {
+        next: { revalidate: 60 }, // Cache por 60 segundos
+      })
+      
+      if (!res.ok) {
+        throw new Error(`Erro ${res.status}: ${res.statusText}`)
       }
-    } catch (error) {
+      
+      const data = await res.json()
+      const quotas = data.quotas || []
+      
+      setQuotas(quotas)
+      
+      // Selecionar todas as cotas por padrão
+      if (quotas.length > 0) {
+        setSelectedQuotas(new Set(quotas.map((q: Quota) => q.id)))
+      }
+    } catch (error: any) {
       console.error('Error fetching quotas:', error)
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao carregar cotas',
+        description: error.message || 'Não foi possível carregar as cotas.',
+      })
     } finally {
       setLoading(false)
     }
