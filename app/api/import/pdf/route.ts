@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { parsePDF } from '@/lib/services/pdfParser'
+import { parsePDFEnhanced } from '@/lib/services/pdfParserEnhanced'
 import { parsePDFWithOCR } from '@/lib/services/pdfParserWithOCR'
 import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
@@ -45,19 +46,18 @@ export async function POST(request: NextRequest) {
 
     await writeFile(filepath, buffer)
 
-    // Parse PDF (tentar método melhorado primeiro)
-    let parseResult = await parsePDF(buffer)
+    // Tentar parse melhorado primeiro
+    let parseResult = await parsePDFEnhanced(buffer, false)
 
-    // Se não encontrou cotas ou cotas incompletas, tentar método melhorado
-    if (parseResult.quotas.length === 0 || parseResult.quotas.some(q => !q.vlBem || !q.vlParcela)) {
+    // Se não encontrou cotas, tentar parse normal
+    if (parseResult.quotas.length === 0) {
       try {
-        const improvedResult = await parsePDFWithOCR(buffer, false)
-        if (improvedResult.quotas.length > parseResult.quotas.length || 
-            improvedResult.quotas.some(q => q.vlBem && q.vlParcela)) {
-          parseResult = improvedResult
+        const normalResult = await parsePDF(buffer)
+        if (normalResult.quotas.length > 0) {
+          parseResult = normalResult
         }
-      } catch (improveError) {
-        console.warn('Método melhorado falhou, usando resultado original:', improveError)
+      } catch (normalError) {
+        console.warn('Parse normal falhou:', normalError)
       }
     }
 

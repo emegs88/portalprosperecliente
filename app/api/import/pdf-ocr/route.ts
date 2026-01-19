@@ -6,6 +6,7 @@ import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
 import { parsePDFWithOCR, ParsedQuota } from '@/lib/services/pdfParserWithOCR'
+import { parsePDFEnhanced } from '@/lib/services/pdfParserEnhanced'
 import { parsePDF } from '@/lib/services/pdfParser'
 
 export const dynamic = 'force-dynamic'
@@ -45,32 +46,39 @@ export async function POST(request: NextRequest) {
 
     await writeFile(filepath, buffer)
 
-    // Tentar parse normal primeiro
-    let parseResult = await parsePDF(buffer)
+    // Tentar parse melhorado primeiro
+    console.log('🔄 Tentando parse melhorado do PDF...')
+    let parseResult = await parsePDFEnhanced(buffer, true)
 
-    // Se não encontrou cotas, tentar com OCR melhorado
+    // Se não encontrou cotas, tentar métodos alternativos
     if (parseResult.quotas.length === 0) {
+      console.log('⚠️ Parse melhorado não encontrou cotas, tentando métodos alternativos...')
+      
       try {
-        console.log('Nenhuma cota encontrada, tentando OCR melhorado...')
+        // Tentar método OCR
         parseResult = await parsePDFWithOCR(buffer, true)
       } catch (ocrError) {
-        console.error('OCR error:', ocrError)
-        // Se OCR falhar, tentar parse melhorado sem OCR
+        console.error('❌ OCR error:', ocrError)
+        
+        // Tentar parse normal como último recurso
         try {
-          parseResult = await parsePDFWithOCR(buffer, false)
-        } catch (fallbackError) {
-          console.error('Fallback parse error:', fallbackError)
-          // Continuar com resultado original
+          const normalResult = await parsePDF(buffer)
+          if (normalResult.quotas.length > 0) {
+            parseResult = normalResult
+          }
+        } catch (normalError) {
+          console.error('❌ Parse normal error:', normalError)
         }
       }
     } else {
-      // Mesmo se encontrou cotas, validar se estão completas
+      console.log(`✅ Parse melhorado encontrou ${parseResult.quotas.length} cotas`)
+      
+      // Validar se estão completas
       const incompleteQuotas = parseResult.quotas.filter(q => !q.vlBem || !q.vlParcela)
       if (incompleteQuotas.length > 0) {
-        console.log(`${incompleteQuotas.length} cotas incompletas encontradas, tentando OCR melhorado...`)
+        console.log(`⚠️ ${incompleteQuotas.length} cotas incompletas, tentando completar com OCR...`)
         try {
           const ocrResult = await parsePDFWithOCR(buffer, true)
-          // Combinar resultados, priorizando OCR para cotas incompletas
           if (ocrResult.quotas.length > 0) {
             // Mesclar resultados
             const quotaMap = new Map<string, ParsedQuota>()
@@ -94,7 +102,7 @@ export async function POST(request: NextRequest) {
             parseResult.quotas = Array.from(quotaMap.values())
           }
         } catch (mergeError) {
-          console.error('Merge error:', mergeError)
+          console.error('❌ Merge error:', mergeError)
         }
       }
     }
