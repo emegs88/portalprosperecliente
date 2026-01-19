@@ -87,12 +87,12 @@ export async function GET(request: NextRequest) {
 
     const salesStats = await prisma.sale.aggregate({
       _sum: {
-        creditValue: true,
-        installmentValue: true,
+        creditAmount: true,
+        installmentAmount: true,
       },
       _avg: {
-        creditValue: true,
-        installmentValue: true,
+        creditAmount: true,
+        installmentAmount: true,
       },
     })
 
@@ -200,10 +200,10 @@ export async function GET(request: NextRequest) {
       },
       sales: {
         total: totalSales,
-        totalCredit: salesStats._sum.creditValue || 0,
-        totalInstallment: salesStats._sum.installmentValue || 0,
-        avgCredit: salesStats._avg.creditValue || 0,
-        avgInstallment: salesStats._avg.installmentValue || 0,
+        totalCredit: salesStats._sum.creditAmount || 0,
+        totalInstallment: salesStats._sum.installmentAmount || 0,
+        avgCredit: salesStats._avg.creditAmount || 0,
+        avgInstallment: salesStats._avg.installmentAmount || 0,
         byStatus: salesByStatus.map(s => ({
           status: s.status,
           count: s._count.id,
