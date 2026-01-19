@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { ModeSelector } from '@/components/simulador/sorteio/ModeSelector'
-import { Disclaimer } from '@/components/simulador/sorteio/Disclaimer'
+import { QuickNav } from '@/components/navigation/QuickNav'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -24,6 +24,7 @@ export default function ConfiguracaoPage() {
   const [drawCount, setDrawCount] = useState(config.draw.count)
   const [speed, setSpeed] = useState(config.animation.speed)
   const [enableSounds, setEnableSounds] = useState(config.animation.enableSounds)
+  const [showDisclaimer, setShowDisclaimer] = useState(true)
 
   useEffect(() => {
     setConfig(loadConfig())
@@ -51,18 +52,15 @@ export default function ConfiguracaoPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 p-4 md:p-8">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl md:text-4xl font-bold text-white">
-            Configuração do Simulador
-          </h1>
-          <p className="text-gray-400">
-            Escolha o modo de simulação e personalize as opções
-          </p>
-        </div>
-
-        <Disclaimer />
+    <div className="space-y-6">
+      <div className="text-center space-y-2">
+        <h1 className="text-3xl md:text-4xl font-bold text-white">
+          Configuração do Simulador
+        </h1>
+        <p className="text-gray-400">
+          Escolha o modo de simulação e personalize as opções
+        </p>
+      </div>
 
         {/* Seleção de Modo */}
         <div className="space-y-4">
@@ -159,18 +157,13 @@ export default function ConfiguracaoPage() {
           </AccordionItem>
         </Accordion>
 
-        {/* Botão Continuar */}
-        <div className="flex justify-center pt-4">
-          <Button
-            size="lg"
-            onClick={handleContinue}
-            disabled={!selectedMode}
-            className="text-lg px-8"
-          >
-            Continuar
-            <ArrowRight className="ml-2 w-5 h-5" />
-          </Button>
-        </div>
+        {/* Navegação */}
+        <QuickNav
+          onNext={handleContinue}
+          nextLabel="Continuar para Seleção"
+          backLabel="Voltar ao Início"
+          showHome={true}
+        />
       </div>
     </div>
   )

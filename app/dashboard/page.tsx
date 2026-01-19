@@ -32,6 +32,14 @@ export default function DashboardPage() {
     }
   }, [status, router])
 
+  useEffect(() => {
+    // Atualizar tab ativa quando URL mudar
+    const tab = searchParams.get('tab')
+    if (tab && tab !== activeTab) {
+      setActiveTab(tab)
+    }
+  }, [searchParams])
+
   if (status === 'loading') {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -48,9 +56,41 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-gray-900">
       <BrandHeader />
       <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-white">Dashboard</h1>
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-white">Dashboard</h1>
+            <p className="text-gray-400 mt-1">Bem-vindo ao portal Prospere</p>
+          </div>
           <LogoutButton />
+        </div>
+
+        {/* Navegação Rápida */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <NavigationCard
+            title="Prospere Club"
+            description="Veja seu nível, benefícios e experiências"
+            href="/dashboard?tab=prospere-club"
+            icon={<Crown className="w-6 h-6" />}
+            badge="Novo"
+          />
+          <NavigationCard
+            title="Simulador de Sorteio"
+            description="Simule sorteios de forma educativa"
+            href="/simulador/sorteio"
+            icon={<Dice6 className="w-6 h-6" />}
+          />
+          <NavigationCard
+            title="Simulações"
+            description="Acumule patrimônio via consórcio"
+            href="/dashboard?tab=simulacoes"
+            icon={<TrendingUp className="w-6 h-6" />}
+          />
+          <NavigationCard
+            title="Minhas Cotas"
+            description="Visualize suas cotas importadas"
+            href="/dashboard?tab=cotas"
+            icon={<FileText className="w-6 h-6" />}
+          />
         </div>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-8 bg-gray-800">

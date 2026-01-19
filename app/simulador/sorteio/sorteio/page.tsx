@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { DrawMachine } from '@/components/simulador/sorteio/DrawMachine'
-import { Disclaimer } from '@/components/simulador/sorteio/Disclaimer'
+import { QuickNav } from '@/components/navigation/QuickNav'
 import { loadSession, saveSession } from '@/lib/simulador/sorteio/storage'
 import { loadConfig } from '@/lib/simulador/sorteio/config'
 import { addToHistory } from '@/lib/simulador/sorteio/storage'
@@ -61,26 +61,27 @@ export default function SorteioPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 p-4 md:p-8">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl md:text-4xl font-bold text-white">
-            Máquina de Sorteio
-          </h1>
-          <p className="text-gray-400">
-            Clique em "Iniciar Sorteio" para sortear {config.draw.count} número{config.draw.count !== 1 ? 's' : ''}
-          </p>
-        </div>
-
-        <Disclaimer />
-
-        <DrawMachine
-          onComplete={handleDrawComplete}
-          count={config.draw.count}
-          min={config.range.min}
-          max={config.range.max}
-        />
+    <div className="space-y-6">
+      <div className="text-center space-y-2">
+        <h1 className="text-3xl md:text-4xl font-bold text-white">
+          Máquina de Sorteio
+        </h1>
+        <p className="text-gray-400">
+          Clique em "Iniciar Sorteio" para sortear {config.draw.count} número{config.draw.count !== 1 ? 's' : ''}
+        </p>
       </div>
+
+      <DrawMachine
+        onComplete={handleDrawComplete}
+        count={config.draw.count}
+        min={config.range.min}
+        max={config.range.max}
+      />
+
+      <QuickNav
+        backLabel="Voltar aos Trios"
+        showHome={true}
+      />
     </div>
   )
 }

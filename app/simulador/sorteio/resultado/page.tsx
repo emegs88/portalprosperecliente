@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ResultPanel } from '@/components/simulador/sorteio/ResultPanel'
 import { SessionStats } from '@/components/simulador/sorteio/SessionStats'
-import { Disclaimer } from '@/components/simulador/sorteio/Disclaimer'
+import { QuickNav } from '@/components/navigation/QuickNav'
 import { loadSession } from '@/lib/simulador/sorteio/storage'
 import { MatchResult } from '@/types/simulador/sorteio'
 
@@ -44,32 +44,35 @@ export default function ResultadoPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 p-4 md:p-8">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl md:text-4xl font-bold text-white">
-            Resultado do Sorteio
-          </h1>
+    <div className="space-y-6">
+      <div className="text-center space-y-2">
+        <h1 className="text-3xl md:text-4xl font-bold text-white">
+          Resultado do Sorteio
+        </h1>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Resultado Principal */}
+        <div className="lg:col-span-2">
+          <ResultPanel
+            drawn={drawn}
+            results={results}
+            onSimulateAgain={handleSimulateAgain}
+          />
         </div>
 
-        <Disclaimer />
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Resultado Principal */}
-          <div className="lg:col-span-2">
-            <ResultPanel
-              drawn={drawn}
-              results={results}
-              onSimulateAgain={handleSimulateAgain}
-            />
-          </div>
-
-          {/* Estatísticas */}
-          <div className="lg:col-span-1">
-            <SessionStats />
-          </div>
+        {/* Estatísticas */}
+        <div className="lg:col-span-1">
+          <SessionStats />
         </div>
       </div>
+
+      <QuickNav
+        onNext={handleSimulateAgain}
+        nextLabel="Simular Novamente"
+        backLabel="Ver Histórico"
+        showHome={true}
+      />
     </div>
   )
 }

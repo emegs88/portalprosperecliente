@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { NumberGrid } from '@/components/simulador/sorteio/NumberGrid'
 import { SelectedChips } from '@/components/simulador/sorteio/SelectedChips'
-import { Disclaimer } from '@/components/simulador/sorteio/Disclaimer'
-import { ArrowRight, ArrowLeft } from 'lucide-react'
+import { QuickNav } from '@/components/navigation/QuickNav'
 import { loadSession, saveSession } from '@/lib/simulador/sorteio/storage'
 import { loadConfig } from '@/lib/simulador/sorteio/config'
 import { isValidSelection } from '@/lib/simulador/sorteio/validation'
@@ -75,27 +74,15 @@ export default function SelecaoPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 p-4 md:p-8">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-white">
-              Seleção de Números
-            </h1>
-            <p className="text-gray-400 mt-2">
-              Selecione os números que deseja usar nos seus trios
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            onClick={() => router.push('/simulador/sorteio/configuracao')}
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Voltar
-          </Button>
-        </div>
-
-        <Disclaimer />
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <h1 className="text-3xl md:text-4xl font-bold text-white">
+          Seleção de Números
+        </h1>
+        <p className="text-gray-400">
+          Selecione os números que deseja usar nos seus trios
+        </p>
+      </div>
 
         <SelectedChips
           numbers={selected}
@@ -111,24 +98,12 @@ export default function SelecaoPage() {
           onClear={handleClear}
         />
 
-        <div className="flex justify-between pt-4">
-          <Button
-            variant="outline"
-            onClick={() => router.push('/simulador/sorteio/configuracao')}
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Voltar
-          </Button>
-          <Button
-            size="lg"
-            onClick={handleContinue}
-            disabled={selected.length === 0}
-          >
-            Avançar para Trios
-            <ArrowRight className="ml-2 w-5 h-5" />
-          </Button>
-        </div>
-      </div>
+      <QuickNav
+        onNext={handleContinue}
+        nextLabel="Avançar para Trios"
+        backLabel="Voltar à Configuração"
+        showHome={true}
+      />
     </div>
   )
 }
