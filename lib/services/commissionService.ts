@@ -168,7 +168,7 @@ export function calculateMetaBonuses(totalCreditBRL: number): number {
 /**
  * Calcular e salvar comissões para uma venda
  */
-export async function calculateCommission(saleId: string) {
+export async function calculateAndSaveCommission(saleId: string) {
   const { prisma } = await import('@/lib/prisma')
   
   const sale = await prisma.sale.findUnique({
@@ -202,7 +202,7 @@ export async function calculateCommission(saleId: string) {
   // Verificar se tem líder
   const hasLeader = !!sellerProfile.leaderId
 
-  // Calcular comissão
+  // Calcular comissão usando a função que retorna resultado
   const commissionResult = calculateCommission({
     creditBRL: sale.creditAmount,
     productId: sale.productType,

@@ -352,8 +352,10 @@ model UserBadge {
 }
 
 // ============================================
-// COTAS E PATRIMÔNIO
+// COTAS E PATRIMÔNIO (DADOS REAIS - OPERAÇÃO)
 // ============================================
+// ⚠️ REGRA CRÍTICA: NUNCA FK para Simulation, SimulationRun, etc.
+// ⚠️ Este módulo é 100% isolado das simulações
 
 model Quota {
   id                String   @id @default(cuid())
@@ -426,26 +428,33 @@ model ImportTotals {
 }
 
 // ============================================
-// SIMULAÇÕES
+// SIMULAÇÕES (SANDBOX FINANCEIRO - ISOLADO)
 // ============================================
+// ⚠️ REGRA CRÍTICA: NUNCA FK para Quota, Sale, ClientProfile
+// ⚠️ Este módulo é 100% isolado dos dados reais
 
 model Simulation {
-  id          String   @id @default(cuid())
-  userId      String
-  name        String   @default("Simulação Sem Nome")
-  description String?
-  isFavorite  Boolean  @default(false)
-  isTemplate  Boolean  @default(false)
-  params      String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(cuid())
+  userId       String
+  name         String   @default("Simulação Sem Nome")
+  description  String?
+  isFavorite   Boolean  @default(false)
+  isTemplate   Boolean  @default(false)
+  params       String // JSON SimulationParams
+  isSimulation Boolean  @default(true) // Flag de segurança
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
+  // ✅ PERMITIDO: FK apenas para User (autenticação)
   user User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   runs SimulationRun[]
 
+  // ❌ PROIBIDO: NUNCA FK para Quota, Sale, ClientProfile, CommissionEntry, etc.
+
   @@index([userId])
   @@index([userId, isFavorite])
-  @@map("simulations")
+  @@index([isSimulation])
+  @@map("simulation_projects") // Renomeado para deixar explícito
 }
 
 model SimulationRun {
@@ -453,8 +462,8 @@ model SimulationRun {
   simulationId             String
   name                     String?
   executedAt               DateTime @default(now())
-  params                   String
-  quotaIds                 String
+  params                   String // JSON SimulationParams
+  quotaIds                 String // JSON string[] - APENAS IDs como string, NÃO FK
   patrimonioFinal          Float    @default(0)
   totalPagoParcelas        Float    @default(0)
   totalPagoBolso           Float    @default(0)
@@ -467,16 +476,21 @@ model SimulationRun {
   numContemplacoes         Int      @default(0)
   numVendas                Int      @default(0)
   cotasAtivasFinal         Int      @default(0)
-  comparacaoCdi            String?
-  comparacaoPoupanca       String?
+  comparacaoCdi            String? // JSON Comparacao
+  comparacaoPoupanca       String? // JSON Comparacao
   resumoTexto              String?
+  isSimulation             Boolean  @default(true) // Flag de segurança
 
+  // ✅ PERMITIDO: FK apenas para Simulation (domínio próprio)
   simulation Simulation        @relation(fields: [simulationId], references: [id], onDelete: Cascade)
   snapshots  MonthlySnapshot[]
   events     EventLog[]
 
+  // ❌ PROIBIDO: NUNCA FK para Quota, Sale, ClientProfile, CommissionEntry, etc.
+
   @@index([simulationId])
   @@index([executedAt])
+  @@index([isSimulation])
   @@map("simulation_runs")
 }
 
@@ -500,38 +514,47 @@ model MonthlySnapshot {
   poupancaAcumulado Float?
   createdAt         DateTime @default(now())
 
+  // ✅ PERMITIDO: FK apenas para SimulationRun (domínio próprio)
   simulationRun SimulationRun @relation(fields: [simulationRunId], references: [id], onDelete: Cascade)
+
+  // ❌ PROIBIDO: NUNCA FK para Quota, Sale, ClientProfile, CommissionEntry, etc.
 
   @@unique([simulationRunId, mes])
   @@index([simulationRunId])
-  @@map("monthly_snapshots")
+  @@map("simulation_snapshots") // Renomeado para deixar explícito
 }
 
 model EventLog {
   id              String   @id @default(cuid())
   simulationRunId String
-  tipo            String
+  tipo            String // PAGAMENTO | CONTEMPLACAO | VENDA | APLICACAO | REINVESTIMENTO
   mes             Int
-  cotaId          String?
-  cotaGrupo       String?
-  cotaNumero      String?
+  cotaId          String? // APENAS string (referência), NÃO FK
+  cotaGrupo       String? // Referência por string
+  cotaNumero      String? // Referência por string
   valor           Float    @default(0)
   descricao       String
   destino         String?
-  metadata        String?
+  metadata        String? // JSON
   createdAt       DateTime @default(now())
 
+  // ✅ PERMITIDO: FK apenas para SimulationRun (domínio próprio)
   simulationRun SimulationRun @relation(fields: [simulationRunId], references: [id], onDelete: Cascade)
+
+  // ❌ PROIBIDO: NUNCA FK para Quota, Sale, ClientProfile, CommissionEntry, etc.
+  // ❌ cotaId é apenas string de referência, NÃO FK
 
   @@index([simulationRunId])
   @@index([simulationRunId, mes])
   @@index([simulationRunId, tipo])
-  @@map("event_logs")
+  @@map("simulation_events") // Renomeado para deixar explícito
 }
 
 // ============================================
-// VENDAS E COMISSÕES
+// VENDAS E COMISSÕES (DADOS REAIS - OPERAÇÃO)
 // ============================================
+// ⚠️ REGRA CRÍTICA: NUNCA FK para Simulation, SimulationRun, etc.
+// ⚠️ Este módulo é 100% isolado das simulações
 
 model Sale {
   id                String    @id @default(cuid())

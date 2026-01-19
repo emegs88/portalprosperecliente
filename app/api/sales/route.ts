@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { calculateCommission } from '@/lib/services/commissionService'
+import { calculateAndSaveCommission } from '@/lib/services/commissionService'
 
 export const dynamic = 'force-dynamic'
 
@@ -134,7 +134,7 @@ export async function POST(request: Request) {
 
     // Calcular e criar comissões
     try {
-      await calculateCommission(sale.id)
+      await calculateAndSaveCommission(sale.id)
     } catch (error) {
       console.error('Error calculating commission:', error)
       // Continuar mesmo se falhar cálculo de comissão
