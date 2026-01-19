@@ -191,7 +191,7 @@ export async function generateSimulationPDF(
   }
 
   // Rodapé
-  const pageCount = doc.getNumberOfPages()
+  const pageCount = (doc.internal as any).getNumberOfPages()
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i)
     doc.setFontSize(10)
