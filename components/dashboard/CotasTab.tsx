@@ -11,7 +11,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { formatCurrency, formatPercent } from '@/lib/utils'
-import { Search, Filter } from 'lucide-react'
+import { Search, Filter, UserCircle } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
@@ -34,6 +34,8 @@ interface Quota {
   vlParcela: number
   vlQuitacao: number
   vlReceber: number
+  isClientQuota?: boolean
+  clientName?: string | null
 }
 
 export function CotasTab() {
@@ -60,12 +62,15 @@ export function CotasTab() {
     }
   }
 
+  const hasClientQuotas = quotas.some(q => q.isClientQuota)
+
   const filteredQuotas = quotas.filter(quota => {
-    const matchesSearch = 
+    const matchesSearch =
       quota.grupo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      quota.cota.toLowerCase().includes(searchTerm.toLowerCase())
-    
-    const matchesFilter = 
+      quota.cota.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (quota.clientName && quota.clientName.toLowerCase().includes(searchTerm.toLowerCase()))
+
+    const matchesFilter =
       filterContempladas === 'all' ||
       (filterContempladas === 'contempladas' && (quota.contemplacao.includes('Contemplada') || quota.contemplacao.includes('CONTEMPLADA'))) ||
       (filterContempladas === 'nao-contempladas' && !quota.contemplacao.includes('Contemplada') && !quota.contemplacao.includes('CONTEMPLADA'))
@@ -145,6 +150,9 @@ export function CotasTab() {
             <Table>
               <TableHeader className="sticky top-0 bg-gray-800">
                 <TableRow>
+                  {hasClientQuotas && (
+                    <TableHead className="text-white">Cliente</TableHead>
+                  )}
                   <TableHead className="text-white">Grupo</TableHead>
                   <TableHead className="text-white">Cota</TableHead>
                   <TableHead className="text-white">Versão</TableHead>
@@ -159,7 +167,7 @@ export function CotasTab() {
               <TableBody>
                 {filteredQuotas.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center text-gray-400 py-8">
+                    <TableCell colSpan={hasClientQuotas ? 10 : 9} className="text-center text-gray-400 py-8">
                       Nenhuma cota encontrada
                     </TableCell>
                   </TableRow>
@@ -173,6 +181,18 @@ export function CotasTab() {
                           : ''
                       }`}
                     >
+                      {hasClientQuotas && (
+                        <TableCell className="text-white">
+                          {quota.isClientQuota ? (
+                            <div className="flex items-center gap-2">
+                              <UserCircle className="w-4 h-4 text-blue-400" />
+                              <span className="text-sm">{quota.clientName || 'Cliente'}</span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-500 text-sm">Própria</span>
+                          )}
+                        </TableCell>
+                      )}
                       <TableCell className="text-white font-medium">{quota.grupo}</TableCell>
                       <TableCell className="text-white">{quota.cota}</TableCell>
                       <TableCell className="text-white">{quota.versao}</TableCell>

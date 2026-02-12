@@ -7,6 +7,7 @@ import { parsePDFEnhanced } from '@/lib/services/pdfParserEnhanced'
 import { parsePDFImproved } from '@/lib/services/pdfParserImproved'
 import { parsePDFWithOCR } from '@/lib/services/pdfParserWithOCR'
 import { parsePDFRobust } from '@/lib/services/pdfParserRobust'
+import { parsePDFAncora, isAncoraFormat } from '@/lib/services/pdfParserAncora'
 import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
@@ -48,11 +49,39 @@ export async function POST(request: NextRequest) {
 
     await writeFile(filepath, buffer)
 
-    // Tentar parse melhorado primeiro (focado em valores brasileiros corretos)
-    console.log('🔄 Tentando parse melhorado do PDF (valores BR)...')
-    let parseResult = await parsePDFImproved(buffer, false)
+    // 1. Tentar parser Âncora primeiro (formato específico, maior precisão)
+    console.log('🔄 Tentando parser Âncora (formato específico)...')
+    let parseResult: { quotas: any[]; errors: string[] } = { quotas: [], errors: [] }
 
-    // Se não encontrou cotas, tentar enhanced como fallback
+    try {
+      const pdfParse = (await import('pdf-parse')).default
+      const pdfData = await pdfParse(buffer, { max: 0 })
+      const rawText = pdfData.text || ''
+
+      if (isAncoraFormat(rawText)) {
+        console.log('✅ Formato Âncora detectado! Usando parser específico...')
+        const ancoraResult = await parsePDFAncora(buffer)
+        if (ancoraResult.quotas.length > 0) {
+          parseResult = {
+            quotas: ancoraResult.quotas,
+            errors: ancoraResult.errors,
+          }
+          console.log(`✅ Parser Âncora encontrou ${parseResult.quotas.length} cotas`)
+        } else {
+          console.log('⚠️ Parser Âncora não encontrou cotas, tentando parsers genéricos...')
+        }
+      }
+    } catch (ancoraError) {
+      console.error('⚠️ Parser Âncora falhou, tentando parsers genéricos:', ancoraError)
+    }
+
+    // 2. Se Âncora não encontrou, tentar parse melhorado (focado em valores brasileiros)
+    if (parseResult.quotas.length === 0) {
+      console.log('🔄 Tentando parse melhorado do PDF (valores BR)...')
+      parseResult = await parsePDFImproved(buffer, false)
+    }
+
+    // 3. Se não encontrou cotas, tentar enhanced como fallback
     if (parseResult.quotas.length === 0 || parseResult.quotas.some(q => !q.vlBem || !q.vlParcela)) {
       console.log('⚠️ Parse melhorado incompleto, tentando enhanced...')
       const enhancedResult = await parsePDFEnhanced(buffer, false)
@@ -61,7 +90,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Se ainda não encontrou, tentar parser robusto (último recurso)
+    // 4. Se ainda não encontrou, tentar parser robusto (último recurso)
     if (parseResult.quotas.length === 0 || parseResult.quotas.some(q => !q.vlBem || !q.vlParcela)) {
       console.log('⚠️ Parse enhanced incompleto, tentando parser robusto (extração agressiva)...')
       try {
@@ -84,23 +113,77 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Extrair dados do cliente do PDF (se Âncora)
+    let clientInfo: { nome: string; cpf: string } | null = null
+    let ancoraClientData: any = null
+
+    try {
+      const pdfParseLib = (await import('pdf-parse')).default
+      const pdfCheck = await pdfParseLib(buffer, { max: 0 })
+      const checkText = pdfCheck.text || ''
+
+      if (isAncoraFormat(checkText)) {
+        const ancoraFull = await parsePDFAncora(buffer)
+        if (ancoraFull.cliente) {
+          clientInfo = {
+            nome: ancoraFull.cliente.nome,
+            cpf: ancoraFull.cliente.cpfCnpj,
+          }
+          ancoraClientData = ancoraFull.cliente
+        }
+      }
+    } catch {
+      // Ignorar erros na extração de cliente
+    }
+
+    // Tentar criar/encontrar conta do cliente se tiver dados
+    const clientEmail = formData.get('clientEmail') as string | null
+    let clientAccount: any = null
+    let needsClientEmail = false
+
+    if (clientInfo) {
+      const { findOrCreateClientFromPDF } = await import('@/lib/services/clientAccountService')
+      clientAccount = await findOrCreateClientFromPDF(
+        {
+          nome: clientInfo.nome,
+          cpf: clientInfo.cpf,
+          email: clientEmail || undefined,
+        },
+        session.user.id
+      )
+
+      // Se criou com email placeholder e não tem email real, sinalizar
+      if (clientAccount.user.isNew && !clientEmail && clientAccount.user.email.endsWith('@prospere.pendente')) {
+        needsClientEmail = true
+      }
+    }
+
+    // Determinar a quem vincular as cotas
+    const quotaOwnerId = clientAccount ? clientAccount.user.id : session.user.id
+    const clientProfileId = clientAccount ? clientAccount.clientProfile.id : null
+
     // Criar batch de importação
     const importBatch = await prisma.importBatch.create({
       data: {
         userId: session.user.id,
+        importedForUserId: clientAccount ? clientAccount.user.id : null,
         sourceType: 'PDF',
         filename: file.name,
         status: 'PENDING',
+        clientName: clientInfo?.nome || null,
+        clientCpf: clientInfo?.cpf || null,
         errorsJson: parseResult.errors.length > 0 ? JSON.stringify(parseResult.errors) : null,
       },
     })
 
-    // Criar quotas
+    // Criar quotas vinculadas ao cliente (ou ao vendedor se não tem cliente)
     if (parseResult.quotas.length > 0) {
       await prisma.quota.createMany({
         data: parseResult.quotas.map(quota => ({
-          userId: session.user.id,
+          userId: quotaOwnerId,
+          clientProfileId,
           importBatchId: importBatch.id,
+          administradora: 'ANCORA ADMINISTRADORA DE CONSORCIOS S.A.',
           grupo: quota.grupo,
           cota: quota.cota,
           versao: quota.versao,
@@ -147,11 +230,36 @@ export async function POST(request: NextRequest) {
         },
       })
 
+      // Enviar email de boas-vindas se criou conta nova com email real
+      if (clientAccount?.user.isNew && clientAccount.setPasswordToken && !needsClientEmail) {
+        try {
+          const { sendEmail, getWelcomeSetPasswordEmail } = await import('@/lib/services/emailService')
+          const emailData = getWelcomeSetPasswordEmail({
+            clientName: clientInfo!.nome,
+            clientEmail: clientAccount.user.email,
+            token: clientAccount.setPasswordToken,
+            vendedorNome: session.user.name || 'Prospere',
+            totalCotas: totals.totalCotas,
+            totalCredito: totals.totalVlBem,
+          })
+          await sendEmail({
+            to: clientAccount.user.email,
+            subject: emailData.subject,
+            html: emailData.html,
+            text: emailData.text,
+          })
+          console.log(`📧 Email de boas-vindas enviado para: ${clientAccount.user.email}`)
+        } catch (emailError) {
+          console.error('⚠️ Erro ao enviar email de boas-vindas:', emailError)
+          // Não falhar a importação por erro de email
+        }
+      }
+
       // Atualizar status do batch
       await prisma.importBatch.update({
         where: { id: importBatch.id },
         data: {
-          status: 'COMPLETED',
+          status: needsClientEmail ? 'NEEDS_EMAIL' : 'COMPLETED',
           parsedAt: new Date(),
         },
       })
@@ -162,6 +270,15 @@ export async function POST(request: NextRequest) {
       importBatchId: importBatch.id,
       quotasCount: parseResult.quotas.length,
       errors: parseResult.errors,
+      // Dados do cliente criado
+      client: clientAccount ? {
+        id: clientAccount.user.id,
+        name: clientAccount.user.name,
+        email: clientAccount.user.email,
+        isNew: clientAccount.user.isNew,
+        needsEmail: needsClientEmail,
+      } : null,
+      needsClientEmail,
     })
   } catch (error: any) {
     console.error('❌ Import PDF error:', error)

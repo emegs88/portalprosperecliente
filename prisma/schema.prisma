@@ -42,10 +42,11 @@ model User {
   clubLevels    UserClubLevel[]
   reservations  Reservation[]
   badges        UserBadge[]
-  quotas        Quota[]
-  simulations   Simulation[]
-  importBatches ImportBatch[]
-  auditLogs     AuditLog[]
+  quotas            Quota[]
+  simulations       Simulation[]
+  importBatches     ImportBatch[]
+  importBatchesFor  ImportBatch[]   @relation("ImportedForUser")
+  auditLogs         AuditLog[]
 
   @@index([email])
   @@index([role])
@@ -100,12 +101,13 @@ model VerificationToken {
 model ClientProfile {
   id                String    @id @default(cuid())
   userId            String    @unique
-  cpf               String?
+  cpf               String?   @unique
   phone             String?
   birthDate         DateTime?
   address           String?
   patrimonyEstimate Float     @default(0)
   currentLevelId    String?
+  importedById      String?
   achievedAt        DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
@@ -115,6 +117,7 @@ model ClientProfile {
   quotas    Quota[]
 
   @@index([currentLevelId])
+  @@index([cpf])
   @@map("client_profiles")
 }
 
@@ -399,20 +402,25 @@ model Quota {
 }
 
 model ImportBatch {
-  id         String    @id @default(cuid())
-  userId     String
-  sourceType String    @default("PDF")
-  filename   String
-  status     String
-  parsedAt   DateTime?
-  createdAt  DateTime  @default(now())
-  errorsJson String?
+  id                String    @id @default(cuid())
+  userId            String
+  importedForUserId String?
+  sourceType        String    @default("PDF")
+  filename          String
+  status            String
+  clientName        String?
+  clientCpf         String?
+  parsedAt          DateTime?
+  createdAt         DateTime  @default(now())
+  errorsJson        String?
 
-  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  quotas Quota[]
-  totals ImportTotals?
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  importedForUser User?         @relation("ImportedForUser", fields: [importedForUserId], references: [id])
+  quotas          Quota[]
+  totals          ImportTotals?
 
   @@index([userId])
+  @@index([importedForUserId])
   @@map("import_batches")
 }
 

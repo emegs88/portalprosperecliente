@@ -7,7 +7,13 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Play, Pause, RotateCcw } from 'lucide-react'
 import { loadConfig } from '@/lib/simulador/sorteio/config'
 import { drawNumbers, generateSeed } from '@/lib/simulador/sorteio/draw'
-import confetti from 'canvas-confetti'
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let confetti: any
+if (typeof window !== 'undefined') {
+  import('canvas-confetti').then(mod => {
+    confetti = mod.default
+  })
+}
 
 interface DrawMachineProps {
   onComplete: (drawn: number[], seed: number) => void
@@ -59,7 +65,7 @@ export function DrawMachine({ onComplete, count, min, max }: DrawMachineProps) {
             setIsDrawing(false)
             onComplete(allDrawn, newSeed)
             
-            if (config.animation.enableConfetti) {
+            if (config.animation.enableConfetti && confetti) {
               confetti({
                 particleCount: 100,
                 spread: 70,
