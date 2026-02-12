@@ -31,14 +31,9 @@ model User {
 
   // Relacionamentos
   clientProfile ClientProfile?
-  sellerProfile SellerProfile?
-  teamLeader    Team[]            @relation("TeamLeader")
-  sellerLeaders SellerProfile[]   @relation("SellerLeader")
   clientSales   Sale[]            @relation("ClientSales")
   sellerSales   Sale[]            @relation("SellerSales")
   partnerSales  Sale[]            @relation("PartnerSales")
-  commissions   CommissionEntry[]
-  payouts       Payout[]          @relation("UserPayouts")
   clubLevels    UserClubLevel[]
   reservations  Reservation[]
   badges        UserBadge[]
@@ -119,43 +114,6 @@ model ClientProfile {
   @@index([currentLevelId])
   @@index([cpf])
   @@map("client_profiles")
-}
-
-model SellerProfile {
-  id             String   @id @default(cuid())
-  userId         String   @unique
-  cpf            String?
-  phone          String?
-  leaderId       String?
-  teamId         String?
-  commissionRate Float    @default(0)
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  leader User?  @relation("SellerLeader", fields: [leaderId], references: [id])
-  team   Team?  @relation(fields: [teamId], references: [id])
-  sales  Sale[]
-
-  @@index([leaderId])
-  @@index([teamId])
-  @@map("seller_profiles")
-}
-
-model Team {
-  id          String   @id @default(cuid())
-  name        String
-  leaderId    String
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  leader  User            @relation("TeamLeader", fields: [leaderId], references: [id])
-  sellers SellerProfile[]
-
-  @@index([leaderId])
-  @@map("teams")
 }
 
 // ============================================
@@ -458,7 +416,7 @@ model Simulation {
   user User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   runs SimulationRun[]
 
-  // ❌ PROIBIDO: NUNCA FK para Quota, Sale, ClientProfile, CommissionEntry, etc.
+  // ❌ PROIBIDO: NUNCA FK para Quota, Sale, ClientProfile, etc.
 
   @@index([userId])
   @@index([userId, isFavorite])
@@ -496,7 +454,7 @@ model SimulationRun {
   snapshots  MonthlySnapshot[]
   events     EventLog[]
 
-  // ❌ PROIBIDO: NUNCA FK para Quota, Sale, ClientProfile, CommissionEntry, etc.
+  // ❌ PROIBIDO: NUNCA FK para Quota, Sale, ClientProfile, etc.
 
   @@index([simulationId])
   @@index([executedAt])
@@ -527,7 +485,7 @@ model MonthlySnapshot {
   // ✅ PERMITIDO: FK apenas para SimulationRun (domínio próprio)
   simulationRun SimulationRun @relation(fields: [simulationRunId], references: [id], onDelete: Cascade)
 
-  // ❌ PROIBIDO: NUNCA FK para Quota, Sale, ClientProfile, CommissionEntry, etc.
+  // ❌ PROIBIDO: NUNCA FK para Quota, Sale, ClientProfile, etc.
 
   @@unique([simulationRunId, mes])
   @@index([simulationRunId])
@@ -552,7 +510,7 @@ model EventLog {
   // ✅ PERMITIDO: FK apenas para SimulationRun (domínio próprio)
   simulationRun SimulationRun @relation(fields: [simulationRunId], references: [id], onDelete: Cascade)
 
-  // ❌ PROIBIDO: NUNCA FK para Quota, Sale, ClientProfile, CommissionEntry, etc.
+  // ❌ PROIBIDO: NUNCA FK para Quota, Sale, ClientProfile, etc.
   // ❌ cotaId é apenas string de referência simulada, NÃO FK para tabela real
 
   @@index([simulationRunId])
@@ -563,7 +521,7 @@ model EventLog {
 }
 
 // ============================================
-// VENDAS E COMISSÕES (DADOS REAIS - OPERAÇÃO)
+// VENDAS (DADOS REAIS - OPERAÇÃO)
 // ============================================
 // ⚠️ REGRA CRÍTICA: NUNCA FK para Simulation, SimulationRun, etc.
 // ⚠️ Este módulo é 100% isolado das simulações
@@ -581,7 +539,6 @@ model Sale {
   status            String    @default("proposta")
   saleDate          DateTime?
   contemplationDate DateTime?
-  commissionRate    Float?
   notes             String?
   metadata          String?
   createdAt         DateTime  @default(now())
@@ -591,10 +548,6 @@ model Sale {
   seller          User              @relation("SellerSales", fields: [sellerId], references: [id])
   partner         User?             @relation("PartnerSales", fields: [partnerId], references: [id])
   quota           Quota?            @relation(fields: [quotaId], references: [id])
-  commissions     CommissionEntry[]
-  payoutEntries   PayoutEntry[]
-  SellerProfile   SellerProfile?    @relation(fields: [sellerProfileId], references: [id])
-  sellerProfileId String?
 
   @@index([clientId])
   @@index([sellerId])
@@ -602,99 +555,6 @@ model Sale {
   @@index([status])
   @@index([saleDate])
   @@map("sales")
-}
-
-model CommissionRule {
-  id            String    @id @default(cuid())
-  name          String
-  description   String?
-  levelId       String?
-  productType   String?
-  baseRate      Float     @default(0)
-  splitRules    String
-  overrideRules String?
-  bonusRules    String?
-  validFrom     DateTime  @default(now())
-  validUntil    DateTime?
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  entries CommissionEntry[]
-
-  @@index([isActive])
-  @@index([validFrom, validUntil])
-  @@map("commission_rules")
-}
-
-model CommissionEntry {
-  id         String    @id @default(cuid())
-  saleId     String
-  userId     String
-  ruleId     String?
-  role       String
-  baseAmount Float
-  rate       Float
-  amount     Float
-  override   Float     @default(0)
-  bonus      Float     @default(0)
-  total      Float
-  status     String    @default("pending")
-  paidAt     DateTime?
-  payoutId   String?
-  notes      String?
-  metadata   String?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-
-  sale   Sale            @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  user   User            @relation(fields: [userId], references: [id])
-  rule   CommissionRule? @relation(fields: [ruleId], references: [id])
-  payout Payout?         @relation(fields: [payoutId], references: [id])
-
-  @@index([saleId])
-  @@index([userId])
-  @@index([status])
-  @@index([payoutId])
-  @@map("commission_entries")
-}
-
-model Payout {
-  id               String    @id @default(cuid())
-  userId           String
-  period           String
-  totalAmount      Float
-  status           String    @default("pending")
-  paidAt           DateTime?
-  paymentMethod    String?
-  paymentReference String?
-  notes            String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-
-  user          User              @relation("UserPayouts", fields: [userId], references: [id])
-  entries       CommissionEntry[]
-  payoutEntries PayoutEntry[]
-
-  @@index([userId])
-  @@index([period])
-  @@index([status])
-  @@map("payouts")
-}
-
-model PayoutEntry {
-  id        String   @id @default(cuid())
-  payoutId  String
-  saleId    String
-  amount    Float
-  createdAt DateTime @default(now())
-
-  payout Payout @relation(fields: [payoutId], references: [id], onDelete: Cascade)
-  sale   Sale   @relation(fields: [saleId], references: [id])
-
-  @@index([payoutId])
-  @@index([saleId])
-  @@map("payout_entries")
 }
 
 // ============================================

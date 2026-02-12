@@ -10,7 +10,6 @@ import { ImportacoesTab } from '@/components/dashboard/ImportacoesTab'
 import { PatrimonioTab } from '@/components/dashboard/PatrimonioTab'
 import { ProspereVidaTab } from '@/components/dashboard/ProspereVidaTab'
 import { SimulacoesTab } from '@/components/dashboard/SimulacoesTab'
-import { PlanoCarreiraTab } from '@/components/dashboard/PlanoCarreiraTab'
 import { ProspereClubTab } from '@/components/dashboard/ProspereClubTab'
 import { BrandHeader } from '@/components/BrandHeader'
 import { LogoutButton } from '@/components/LogoutButton'
@@ -112,7 +111,7 @@ export default function DashboardPage() {
           }} 
           className="w-full"
         >
-          <TabsList className="grid w-full grid-cols-4 md:grid-cols-8 bg-[#0B1220] border border-[rgba(255,255,255,0.08)] gap-1 p-1 rounded-lg">
+          <TabsList className="grid w-full grid-cols-4 md:grid-cols-7 bg-[#0B1220] border border-[rgba(255,255,255,0.08)] gap-1 p-1 rounded-lg">
             <TabsTrigger 
               value="dashboard"
               className="data-[state=active]:bg-[#111B2E] data-[state=active]:text-[#FFFFFF] data-[state=active]:border data-[state=active]:border-[rgba(59,130,246,0.35)] text-[#9CA3AF] hover:text-[#FFFFFF] hover:bg-[rgba(255,255,255,0.05)] rounded-md transition-all duration-200"
@@ -155,12 +154,6 @@ export default function DashboardPage() {
             >
               Simulações
             </TabsTrigger>
-            <TabsTrigger 
-              value="plano-carreira"
-              className="data-[state=active]:bg-[#111B2E] data-[state=active]:text-[#FFFFFF] data-[state=active]:border data-[state=active]:border-[rgba(59,130,246,0.35)] text-[#9CA3AF] hover:text-[#FFFFFF] hover:bg-[rgba(255,255,255,0.05)] rounded-md transition-all duration-200"
-            >
-              Plano de Carreira
-            </TabsTrigger>
           </TabsList>
           <TabsContent value="dashboard" className="mt-6">
             <ErrorBoundary fallback={ErrorFallback}>
@@ -195,11 +188,6 @@ export default function DashboardPage() {
           <TabsContent value="simulacoes" className="mt-6">
             <ErrorBoundary fallback={ErrorFallback}>
               <SimulacoesTab />
-            </ErrorBoundary>
-          </TabsContent>
-          <TabsContent value="plano-carreira" className="mt-6">
-            <ErrorBoundary fallback={ErrorFallback}>
-              <PlanoCarreiraTab />
             </ErrorBoundary>
           </TabsContent>
         </Tabs>
