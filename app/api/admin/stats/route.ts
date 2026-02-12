@@ -34,42 +34,21 @@ export async function GET(request: NextRequest) {
     const [
       totalUsers,
       totalClients,
-      totalSellers,
       totalQuotas,
       totalSales,
       totalSimulations,
       totalReservations,
-      totalCommissions,
     ] = await Promise.all([
-      // Total de usuários
       prisma.user.count(),
-      
-      // Total de clientes (usuários com role CLIENTE)
       prisma.user.count({
         where: { role: 'CLIENTE' },
       }),
-      
-      // Total de vendedores
-      prisma.user.count({
-        where: { role: { in: ['VENDEDOR', 'LIDER'] } },
-      }),
-      
-      // Total de cotas
       prisma.quota.count(),
-      
-      // Total de vendas
       prisma.sale.count(),
-      
-      // Total de simulações
       prisma.simulation.count({
         where: { isSimulation: true },
       }),
-      
-      // Total de reservas
       prisma.reservation.count(),
-      
-      // Total de comissões
-      prisma.commissionEntry.count(),
     ])
 
     // Calcular valores totais
@@ -95,29 +74,6 @@ export async function GET(request: NextRequest) {
         installmentAmount: true,
       },
     })
-
-    // Buscar comissões e calcular por role
-    const allCommissions = await prisma.commissionEntry.findMany({
-      select: {
-        role: true,
-        total: true,
-      },
-    })
-
-    const commissionsStats = {
-      _sum: {
-        sellerValue: allCommissions
-          .filter(c => c.role === 'VENDEDOR' || c.role === 'SELLER')
-          .reduce((sum, c) => sum + (c.total || 0), 0),
-        leaderValue: allCommissions
-          .filter(c => c.role === 'LIDER' || c.role === 'LEADER')
-          .reduce((sum, c) => sum + (c.total || 0), 0),
-        partnerValue: allCommissions
-          .filter(c => c.role === 'PARCEIRO' || c.role === 'PARTNER')
-          .reduce((sum, c) => sum + (c.total || 0), 0),
-        totalValue: allCommissions.reduce((sum, c) => sum + (c.total || 0), 0),
-      },
-    }
 
     // Estatísticas de simulações
     const simulationStats = await prisma.simulationRun.aggregate({
@@ -195,12 +151,10 @@ export async function GET(request: NextRequest) {
       overview: {
         totalUsers,
         totalClients,
-        totalSellers,
         totalQuotas,
         totalSales,
         totalSimulations,
         totalReservations,
-        totalCommissions,
       },
       quotas: {
         total: totalQuotas,
@@ -222,13 +176,6 @@ export async function GET(request: NextRequest) {
           status: s.status,
           count: s._count.id,
         })),
-      },
-      commissions: {
-        total: totalCommissions,
-        totalSeller: commissionsStats._sum.sellerValue || 0,
-        totalLeader: commissionsStats._sum.leaderValue || 0,
-        totalPartner: commissionsStats._sum.partnerValue || 0,
-        totalValue: commissionsStats._sum.totalValue || 0,
       },
       simulations: {
         total: totalSimulations,

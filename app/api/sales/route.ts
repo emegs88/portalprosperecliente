@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { calculateAndSaveCommission } from '@/lib/domain/commission/services/commissionService'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,13 +54,6 @@ export async function GET(request: Request) {
           select: { id: true, name: true, email: true, image: true },
         },
         quota: true,
-        commissions: {
-          include: {
-            user: {
-              select: { id: true, name: true, email: true },
-            },
-          },
-        },
       },
       orderBy: { createdAt: 'desc' },
       take: 100,
@@ -131,14 +123,6 @@ export async function POST(request: Request) {
         quota: true,
       },
     })
-
-    // Calcular e criar comissões
-    try {
-      await calculateAndSaveCommission(sale.id)
-    } catch (error) {
-      console.error('Error calculating commission:', error)
-      // Continuar mesmo se falhar cálculo de comissão
-    }
 
     return NextResponse.json(sale, { status: 201 })
   } catch (error: any) {

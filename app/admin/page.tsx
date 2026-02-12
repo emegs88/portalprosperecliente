@@ -43,12 +43,10 @@ interface AdminStats {
   overview: {
     totalUsers: number
     totalClients: number
-    totalSellers: number
     totalQuotas: number
     totalSales: number
     totalSimulations: number
     totalReservations: number
-    totalCommissions: number
   }
   quotas: {
     total: number
@@ -65,13 +63,6 @@ interface AdminStats {
     avgCredit: number
     avgInstallment: number
     byStatus: Array<{ status: string; count: number }>
-  }
-  commissions: {
-    total: number
-    totalSeller: number
-    totalLeader: number
-    totalPartner: number
-    totalValue: number
   }
   simulations: {
     total: number
@@ -214,7 +205,7 @@ export default function AdminPage() {
                 {stats?.overview.totalUsers || 0}
               </div>
               <div className="text-xs text-gray-500">
-                {stats?.overview.totalClients || 0} clientes • {stats?.overview.totalSellers || 0} vendedores
+                {stats?.overview.totalClients || 0} clientes
               </div>
               <div className="text-xs text-green-400 mt-1">
                 +{stats?.last30Days.newUsers || 0} nos últimos 30 dias
@@ -289,7 +280,6 @@ export default function AdminPage() {
             <TabsTrigger value="overview">Visão Geral</TabsTrigger>
             <TabsTrigger value="sales">Vendas</TabsTrigger>
             <TabsTrigger value="quotas">Cotas</TabsTrigger>
-            <TabsTrigger value="commissions">Comissões</TabsTrigger>
             <TabsTrigger value="simulations">Simulações</TabsTrigger>
           </TabsList>
 
@@ -353,12 +343,6 @@ export default function AdminPage() {
                       <p className="text-sm text-gray-400 mb-1">Crédito Total (Vendas)</p>
                       <p className="text-2xl font-bold text-blue-400">
                         {formatCurrency(stats?.sales.totalCredit || 0)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-400 mb-1">Total de Comissões</p>
-                      <p className="text-2xl font-bold text-green-400">
-                        {formatCurrency(stats?.commissions.totalValue || 0)}
                       </p>
                     </div>
                   </CardContent>
@@ -492,66 +476,6 @@ export default function AdminPage() {
                       {formatCurrency(stats?.quotas.totalToReceive || 0)}
                     </p>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Tab: Comissões */}
-          <TabsContent value="commissions" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card className="bg-[#0B1220] border-gray-700">
-                <CardHeader>
-                  <CardTitle className="text-sm text-gray-400">Total de Comissões</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-white">
-                    {stats?.commissions.total || 0}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-blue-600/20 border-blue-500/50">
-                <CardHeader>
-                  <CardTitle className="text-sm text-blue-400">Vendedores</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-white">
-                    {formatCurrency(stats?.commissions.totalSeller || 0)}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-purple-600/20 border-purple-500/50">
-                <CardHeader>
-                  <CardTitle className="text-sm text-purple-400">Líderes</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-white">
-                    {formatCurrency(stats?.commissions.totalLeader || 0)}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-green-600/20 border-green-500/50">
-                <CardHeader>
-                  <CardTitle className="text-sm text-green-400">Parceiros</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-white">
-                    {formatCurrency(stats?.commissions.totalPartner || 0)}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card className="bg-[#0B1220] border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-white">Valor Total de Comissões</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-4xl font-bold text-green-400">
-                  {formatCurrency(stats?.commissions.totalValue || 0)}
                 </div>
               </CardContent>
             </Card>

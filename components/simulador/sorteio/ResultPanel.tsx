@@ -8,7 +8,13 @@ import { CheckCircle, XCircle, Award, BookOpen, MessageCircle } from 'lucide-rea
 import { cn } from '@/lib/utils'
 import { MatchResult } from '@/types/simulador/sorteio'
 import { loadConfig } from '@/lib/simulador/sorteio/config'
-import confetti from 'canvas-confetti'
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let confetti: any
+if (typeof window !== 'undefined') {
+  import('canvas-confetti').then(mod => {
+    confetti = mod.default
+  })
+}
 
 interface ResultPanelProps {
   drawn: number[]
@@ -21,7 +27,7 @@ export function ResultPanel({ drawn, results, onSimulateAgain }: ResultPanelProp
   const hasWinner = results.some(r => r.isWinner)
 
   useEffect(() => {
-    if (hasWinner && config.animation.enableConfetti) {
+    if (hasWinner && config.animation.enableConfetti && confetti) {
       confetti({
         particleCount: 200,
         spread: 70,
